@@ -6,6 +6,8 @@ const WARNING_DAYS = 5;
 const CRITICAL_DAYS = 2;
 const ACTIVATION_WAIT_DAYS = 2;
 const VALIDATION_DEBOUNCE_MS = 500;
+/** ponytail: set true to re-enable remote validation against compraentradas */
+const VALIDATION_ENABLED = true;
 
 const tabButtons = document.querySelectorAll(".tabs__btn");
 const panels = document.querySelectorAll(".panel");
@@ -31,6 +33,9 @@ const importBtn = document.getElementById("import-btn");
 const importInput = document.getElementById("import-input");
 const listMessage = document.getElementById("list-message");
 const formMessage = document.getElementById("form-message");
+const barcodeOverlay = document.getElementById("barcode-overlay");
+const barcodeOverlaySvg = document.getElementById("barcode-overlay-svg");
+const barcodeOverlayClose = document.getElementById("barcode-overlay-close");
 
 let activeTabId = "list";
 let listSort = "expiry";
@@ -40,6 +45,28 @@ let validationState = { status: "idle", code: "" };
 let validationRequestId = 0;
 let validationDebounceTimer = null;
 
+// ─── Barcode overlay ───────────────────────────────────────────────────────
+
+function openBarcodeOverlay(code) {
+  barcodeOverlaySvg.innerHTML = renderBarcodeSvg(code);
+  barcodeOverlay.hidden = false;
+  barcodeOverlayClose.focus();
+}
+
+function closeBarcodeOverlay() {
+  if (barcodeOverlay.hidden) return;
+  barcodeOverlay.hidden = true;
+  barcodeOverlaySvg.innerHTML = "";
+}
+
+barcodeOverlayClose.addEventListener("click", closeBarcodeOverlay);
+barcodeOverlay.addEventListener("click", (event) => {
+  if (event.target === barcodeOverlay) closeBarcodeOverlay();
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") closeBarcodeOverlay();
+});
+
 // ─── Code validation ────────────────────────────────────────────────────────
 
 function isSavableStatus(status) {
@@ -47,6 +74,7 @@ function isSavableStatus(status) {
 }
 
 async function validateCode(code) {
+  if (!VALIDATION_ENABLED) return { status: "valid" };
   return browser.runtime.sendMessage({
     type: "validate-code",
     code,
@@ -74,6 +102,12 @@ function updateValidationUI() {
   if (!code) {
     codeValidation.hidden = true;
     submitBtn.disabled = true;
+    return;
+  }
+
+  if (!VALIDATION_ENABLED) {
+    codeValidation.hidden = true;
+    submitBtn.disabled = !isFormComplete();
     return;
   }
 
@@ -150,6 +184,13 @@ function scheduleValidation() {
   if (!code) {
     validationRequestId += 1;
     resetValidation();
+    return;
+  }
+
+  if (!VALIDATION_ENABLED) {
+    validationState = { status: "valid", code };
+    updateValidationUI();
+    saveFormDraft();
     return;
   }
 
@@ -464,12 +505,12 @@ function getCardUrgency(daysRemaining, waiting) {
 
 const SORT_ICON_PATHS = {
   expiry: {
-    asc: "M129-276q-86-86-86-209t86-209q86-86 209-86t209 86q86 86 86 209t-86 209q-86 86-209 86t-209-86Zm633 116v-526l-57 57-42-42 129-129 128 129-42 42-56-56v525h-60ZM421-354l41-41-94-94v-149h-60v172l113 112Z",
-    desc: "M129-276q-86-86-86-209t86-209q86-86 209-86t209 86q86 86 86 209t-86 209q-86 86-209 86t-209-86Zm663 116L663-289l42-42 56 56v-525h60v526l57-57 42 42-128 129ZM421-354l41-41-94-94v-149h-60v172l113 112Z",
+    asc: "M129-276q-86-86-86-209t86-209q86-86 209-86t209 86q86 86 86 209t-86 209q-86 86-209 86t-209-86Zm663 116L663-289l42-42 56 56v-525h60v526l57-57 42 42-128 129ZM421-354l41-41-94-94v-149h-60v172l113 112Z",
+    desc: "M129-276q-86-86-86-209t86-209q86-86 209-86t209 86q86 86 86 209t-86 209q-86 86-209 86t-209-86Zm633 116v-526l-57 57-42-42 129-129 128 129-42 42-56-56v525h-60ZM421-354l41-41-94-94v-149h-60v172l113 112Z",
   },
   seats: {
-    asc: "M474-486q26-32 38.5-66t12.5-79q0-45-12.5-79T474-776q76-17 133.5 23T665-631q0 82-57.5 122T474-486Zm216 326v-94q0-51-26-95t-90-74q173 22 236.5 64T874-254v94H690Zm110-289v-100H700v-60h100v-100h60v100h100v60H860v100h-60Zm-593-74q-42-42-42-108t42-108q42-42 108-42t108 42q42 42 42 108t-42 108q-42 42-108 42t-108-42ZM0-160v-94q0-35 18.5-63.5T68-360q72-32 128.5-46T315-420q62 0 118 14t128 46q31 14 50 42.5t19 63.5v94H0Z",
-    desc: "M474-486q26-32 38.5-66t12.5-79q0-45-12.5-79T474-776q76-17 133.5 23T665-631q0 82-57.5 122T474-486Zm216 326v-94q0-51-26-95t-90-74q173 22 236.5 64T874-254v94H690Zm270-389H700v-60h260v60Zm-753 26q-42-42-42-108t42-108q42-42 108-42t108 42q42 42 42 108t-42 108q-42 42-108 42t-108-42ZM0-160v-94q0-35 18.5-63.5T68-360q72-32 128.5-46T315-420q62 0 118 14t128 46q31 14 50 42.5t19 63.5v94H0Z",
+    asc: "M474-486q26-32 38.5-66t12.5-79q0-45-12.5-79T474-776q76-17 133.5 23T665-631q0 82-57.5 122T474-486Zm216 326v-94q0-51-26-95t-90-74q173 22 236.5 64T874-254v94H690Zm270-389H700v-60h260v60Zm-753 26q-42-42-42-108t42-108q42-42 108-42t108 42q42 42 42 108t-42 108q-42 42-108 42t-108-42ZM0-160v-94q0-35 18.5-63.5T68-360q72-32 128.5-46T315-420q62 0 118 14t128 46q31 14 50 42.5t19 63.5v94H0Z",
+    desc: "M474-486q26-32 38.5-66t12.5-79q0-45-12.5-79T474-776q76-17 133.5 23T665-631q0 82-57.5 122T474-486Zm216 326v-94q0-51-26-95t-90-74q173 22 236.5 64T874-254v94H690Zm110-289v-100H700v-60h100v-100h60v100h100v60H860v100h-60Zm-593-74q-42-42-42-108t42-108q42-42 108-42t108 42q42 42 42 108t-42 108q-42 42-108 42t-108-42ZM0-160v-94q0-35 18.5-63.5T68-360q72-32 128.5-46T315-420q62 0 118 14t128 46q31 14 50 42.5t19 63.5v94H0Z",
   },
 };
 
@@ -588,27 +629,21 @@ function createCard(item, index) {
   const card = document.createElement("article");
   card.className = ["card", urgency !== "normal" ? `card--${urgency}` : ""].join(" ").trim();
 
+  const header = document.createElement("div");
+  header.className = "card__header";
+
   const codeEl = document.createElement("p");
   codeEl.className = "card__code";
   codeEl.textContent = item.code;
 
-  const meta = document.createElement("div");
-  meta.className = "card__meta";
-
   const dateEl = document.createElement("span");
   dateEl.className = "card__date";
-  dateEl.textContent = `Creado: ${formatReadableDate(item.createdAt)}`;
+  dateEl.textContent = formatReadableDate(item.createdAt);
 
-  if (item.seats != null) {
-    const seatsEl = createMetaRow(
-      createMetaIcon(ICONS.seat),
-      `${item.seats} butaca${item.seats === 1 ? "" : "s"}`,
-      "card__seats",
-    );
-    meta.append(dateEl, seatsEl);
-  } else {
-    meta.append(dateEl);
-  }
+  header.append(codeEl, dateEl);
+
+  const meta = document.createElement("div");
+  meta.className = "card__meta";
 
   const statusClasses = ["card__status", urgency !== "normal" ? `card__status--${urgency}` : ""].join(" ").trim();
 
@@ -629,7 +664,18 @@ function createCard(item, index) {
     statusClasses,
   );
 
-  meta.append(statusEl);
+  if (item.seats != null) {
+    meta.append(
+      createMetaRow(
+        createMetaIcon(ICONS.seat),
+        `${item.seats} butaca${item.seats === 1 ? "" : "s"}`,
+        "card__seats",
+      ),
+      statusEl,
+    );
+  } else {
+    meta.append(statusEl);
+  }
 
   const actions = document.createElement("div");
   actions.className = "card__actions";
@@ -644,6 +690,16 @@ function createCard(item, index) {
     copyBtn.addEventListener("click", () => copyCode(item.code, copyBtn));
   }
 
+  const barcodeBtn = document.createElement("button");
+  barcodeBtn.type = "button";
+  barcodeBtn.className = "btn btn--secondary btn--icon";
+  barcodeBtn.title = waiting ? "Aún no disponible" : "Mostrar código de barras";
+  barcodeBtn.textContent = "Barras";
+  barcodeBtn.disabled = waiting;
+  if (!waiting) {
+    barcodeBtn.addEventListener("click", () => openBarcodeOverlay(item.code));
+  }
+
   const deleteBtn = document.createElement("button");
   deleteBtn.type = "button";
   deleteBtn.className = "btn btn--danger btn--icon";
@@ -654,8 +710,8 @@ function createCard(item, index) {
     await renderList();
   });
 
-  actions.append(copyBtn, deleteBtn);
-  card.append(codeEl, meta, actions);
+  actions.append(copyBtn, barcodeBtn, deleteBtn);
+  card.append(header, meta, actions);
 
   return card;
 }

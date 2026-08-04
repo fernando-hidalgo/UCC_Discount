@@ -259,25 +259,37 @@ body {
   border-color: var(--color-danger-border);
 }
 
+.card__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
 .card__code {
   font-size: 16px;
   font-weight: 700;
   letter-spacing: 0.04em;
   color: var(--color-text);
-  margin-bottom: 6px;
+  margin: 0;
   word-break: break-all;
+  min-width: 0;
 }
 
 .card__meta {
   display: flex;
-  flex-direction: column;
-  gap: 3px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   margin-bottom: 12px;
 }
 
 .card__date {
   font-size: 12px;
   color: var(--color-text-muted);
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .card__seats {
@@ -302,6 +314,9 @@ body {
   font-size: 12px;
   font-weight: 600;
   color: var(--color-primary);
+  flex-shrink: 0;
+  white-space: nowrap;
+  margin-left: auto;
 }
 
 .card__status--warning {
@@ -319,6 +334,70 @@ body {
 .card__actions {
   display: flex;
   gap: 8px;
+}
+
+/* ─── Barcode overlay ────────────────────────────────────────────────────── */
+
+.barcode-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 24, 69, 0.55);
+}
+
+.barcode-overlay[hidden] {
+  display: none;
+}
+
+.barcode-overlay__panel {
+  width: 100%;
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 14px 14px 18px;
+}
+
+.barcode-overlay__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.barcode-overlay__title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.barcode-overlay__close {
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.barcode-overlay__close:hover {
+  color: var(--color-text);
+}
+
+.barcode-overlay__svg {
+  background: #fff;
+  padding: 8px 0;
+}
+
+.barcode-overlay__svg svg {
+  display: block;
+  width: 100%;
+  height: auto;
 }
 
 /* ─── Form ───────────────────────────────────────────────────────────────── */

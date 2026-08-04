@@ -55,7 +55,7 @@
               aria-pressed="true"
             >
               <svg class="sort-toggle__icon" viewBox="0 -960 960 960" fill="currentColor" aria-hidden="true">
-                <path d="M129-276q-86-86-86-209t86-209q86-86 209-86t209 86q86 86 86 209t-86 209q-86 86-209 86t-209-86Zm633 116v-526l-57 57-42-42 129-129 128 129-42 42-56-56v525h-60ZM421-354l41-41-94-94v-149h-60v172l113 112Z"/>
+                <path d="M129-276q-86-86-86-209t86-209q86-86 209-86t209 86q86 86 86 209t-86 209q-86 86-209 86t-209-86Zm663 116L663-289l42-42 56 56v-525h60v526l57-57 42 42-128 129ZM421-354l41-41-94-94v-149h-60v172l113 112Z"/>
               </svg>
             </button>
             <button
@@ -67,7 +67,7 @@
               aria-pressed="false"
             >
               <svg class="sort-toggle__icon" viewBox="0 -960 960 960" fill="currentColor" aria-hidden="true">
-                <path d="M474-486q26-32 38.5-66t12.5-79q0-45-12.5-79T474-776q76-17 133.5 23T665-631q0 82-57.5 122T474-486Zm216 326v-94q0-51-26-95t-90-74q173 22 236.5 64T874-254v94H690Zm110-289v-100H700v-60h100v-100h60v100h100v60H860v100h-60Zm-593-74q-42-42-42-108t42-108q42-42 108-42t108 42q42 42 42 108t-42 108q-42 42-108 42t-108-42ZM0-160v-94q0-35 18.5-63.5T68-360q72-32 128.5-46T315-420q62 0 118 14t128 46q31 14 50 42.5t19 63.5v94H0Z"/>
+                <path d="M474-486q26-32 38.5-66t12.5-79q0-45-12.5-79T474-776q76-17 133.5 23T665-631q0 82-57.5 122T474-486Zm216 326v-94q0-51-26-95t-90-74q173 22 236.5 64T874-254v94H690Zm270-389H700v-60h260v60Zm-753 26q-42-42-42-108t42-108q42-42 108-42t108 42q42 42 42 108t-42 108q-42 42-108 42t-108-42ZM0-160v-94q0-35 18.5-63.5T68-360q72-32 128.5-46T315-420q62 0 118 14t128 46q31 14 50 42.5t19 63.5v94H0Z"/>
               </svg>
             </button>
           </div>
@@ -180,6 +180,17 @@
     </section>
   </main>
 
+  <div id="barcode-overlay" class="barcode-overlay" hidden>
+    <div class="barcode-overlay__panel" role="dialog" aria-modal="true" aria-labelledby="barcode-overlay-title">
+      <div class="barcode-overlay__header">
+        <h2 id="barcode-overlay-title" class="barcode-overlay__title">Código de barras</h2>
+        <button type="button" class="barcode-overlay__close" id="barcode-overlay-close" aria-label="Cerrar">×</button>
+      </div>
+      <div id="barcode-overlay-svg" class="barcode-overlay__svg"></div>
+    </div>
+  </div>
+
+  <script src="barcode.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>
