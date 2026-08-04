@@ -54,8 +54,17 @@ let validationDebounceTimer = null;
 
 // ─── Barcode overlay ───────────────────────────────────────────────────────
 
+function setBarcodeOverlaySvg(code) {
+  barcodeOverlaySvg.replaceChildren();
+  const doc = new DOMParser().parseFromString(renderBarcodeSvg(code), "image/svg+xml");
+  const svg = doc.documentElement;
+  if (svg?.nodeName === "svg" && !doc.querySelector("parsererror")) {
+    barcodeOverlaySvg.appendChild(document.importNode(svg, true));
+  }
+}
+
 function openBarcodeOverlay(code) {
-  barcodeOverlaySvg.innerHTML = renderBarcodeSvg(code);
+  setBarcodeOverlaySvg(code);
   barcodeOverlay.hidden = false;
   barcodeOverlayClose.focus();
 }
@@ -63,7 +72,7 @@ function openBarcodeOverlay(code) {
 function closeBarcodeOverlay() {
   if (barcodeOverlay.hidden) return;
   barcodeOverlay.hidden = true;
-  barcodeOverlaySvg.innerHTML = "";
+  barcodeOverlaySvg.replaceChildren();
 }
 
 barcodeOverlayClose.addEventListener("click", closeBarcodeOverlay);
@@ -285,7 +294,7 @@ function renderCalendar() {
     year: "numeric",
   }).format(new Date(year, month, 1));
 
-  dateGrid.innerHTML = "";
+  dateGrid.replaceChildren();
 
   const firstDay = new Date(year, month, 1);
   const offset = (firstDay.getDay() + 6) % 7;
@@ -767,7 +776,7 @@ function createCard(item) {
 
 async function renderList() {
   const codes = await purgeExpired();
-  codeList.innerHTML = "";
+  codeList.replaceChildren();
 
   if (codes.length === 0) {
     emptyList.hidden = false;
@@ -1004,7 +1013,7 @@ async function leaveApp() {
   await signOut();
   authSession = null;
   await clearCodesCache();
-  codeList.innerHTML = "";
+  codeList.replaceChildren();
   clearForm();
   showView("login");
   updateAuthChrome();

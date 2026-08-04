@@ -1,5 +1,5 @@
 export const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyDnu32FYwtAKKgEV9Jt28C0c8J6YtToZgc",
+  apiKey: "TU_API_KEY",
   // Same-origin as Hosting — required for Safari/iOS (blocks 3rd-party storage on redirect)
   authDomain: "ucc-discount.web.app",
   projectId: "ucc-discount",
