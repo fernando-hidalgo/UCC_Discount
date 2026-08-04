@@ -2,8 +2,13 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#003092">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>UCC Descuentos</title>
+  <link rel="icon" href="icon-48.png">
+  <link rel="apple-touch-icon" href="icon-64.png">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -32,35 +37,12 @@
     </header>
 
     <nav class="tabs" role="tablist">
-      <button
-        class="tabs__btn tabs__btn--active"
-        role="tab"
-        aria-selected="true"
-        aria-controls="panel-list"
-        id="tab-list"
-        data-tab="list"
-      >
-        Mis códigos
-      </button>
-      <button
-        class="tabs__btn"
-        role="tab"
-        aria-selected="false"
-        aria-controls="panel-add"
-        id="tab-add"
-        data-tab="add"
-      >
-        Añadir código
-      </button>
+      <button class="tabs__btn tabs__btn--active" role="tab" aria-selected="true" aria-controls="panel-list" id="tab-list" data-tab="list">Mis códigos</button>
+      <button class="tabs__btn" role="tab" aria-selected="false" aria-controls="panel-add" id="tab-add" data-tab="add">Añadir código</button>
     </nav>
 
     <main class="main">
-      <section
-        class="panel panel--active"
-        id="panel-list"
-        role="tabpanel"
-        aria-labelledby="tab-list"
-      >
+      <section class="panel panel--active" id="panel-list" role="tabpanel" aria-labelledby="tab-list">
         <div class="list-toolbar">
           <span class="list-toolbar__label">Ordenar por</span>
           <div class="list-toolbar__controls">
@@ -73,7 +55,7 @@
                 aria-label="Ordenar por caducidad, menor a mayor"
                 aria-pressed="true"
               >
-                <svg class="sort-toggle__icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                <svg class="toolbar-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
                   <path fill="currentColor" d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm0 18c-4.4 0-8-3.6-8-8s3.6-8 8-8 8 3.6 8 8-3.6 8-8 8zm.5-13H11v6l5.2 3.2.8-1.3-4.5-2.7V7z"/>
                 </svg>
               </button>
@@ -85,32 +67,20 @@
                 aria-label="Ordenar por butacas, menor a mayor"
                 aria-pressed="false"
               >
-                <svg class="sort-toggle__icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                <svg class="toolbar-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
                   <path fill="currentColor" d="M4 18v3h3v-3h10v3h3v-6H4zm15-8h3v3h-3zM2 10h3v3H2zm15 3H7V5c0-1.1.9-2 2-2h6c1.1 0 2 .9 2 2z"/>
                 </svg>
               </button>
             </div>
             <span class="toolbar-divider" aria-hidden="true"></span>
-            <button
-              type="button"
-              class="toolbar-btn"
-              id="import-btn"
-              title="Importar JSON"
-              aria-label="Importar códigos desde JSON"
-            >
-              <svg class="sort-toggle__icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <button type="button" class="toolbar-btn" id="import-btn" title="Importar JSON" aria-label="Importar códigos desde JSON">
+              <svg class="toolbar-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
                 <path fill="currentColor" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/>
                 <path fill="currentColor" d="M12 11l-3 3h2v4h2v-4h2l-3-3z"/>
               </svg>
             </button>
-            <button
-              type="button"
-              class="toolbar-btn"
-              id="export-btn"
-              title="Exportar JSON"
-              aria-label="Exportar códigos a JSON"
-            >
-              <svg class="sort-toggle__icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <button type="button" class="toolbar-btn" id="export-btn" title="Exportar JSON" aria-label="Exportar códigos a JSON">
+              <svg class="toolbar-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
                 <path fill="currentColor" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/>
                 <path fill="currentColor" d="M12 19l3-3h-2v-4h-2v4H9l3 3z"/>
               </svg>
@@ -122,7 +92,7 @@
         <div id="code-list" class="code-list" aria-live="polite"></div>
         <div id="empty-list" class="empty-state" hidden>
           <div class="empty-state__icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" width="36" height="36" fill="currentColor">
+            <svg viewBox="0 0 24 24" width="40" height="40" fill="currentColor">
               <path d="M22 10V6a2 2 0 0 0-2-2H4c-1.1 0-1.99.89-1.99 2v4c1.1 0 1.99.9 1.99 2s-.89 2-2 2v4c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2v-4c-1.1 0-2-.9-2-2s.9-2 2-2zm-9 7.5h-2v-2h2v2zm0-4.5h-2v-2h2v2zm0-4.5h-2v-2h2v2z"/>
             </svg>
           </div>
@@ -131,73 +101,21 @@
         </div>
       </section>
 
-      <section
-        class="panel"
-        id="panel-add"
-        role="tabpanel"
-        aria-labelledby="tab-add"
-        hidden
-      >
+      <section class="panel" id="panel-add" role="tabpanel" aria-labelledby="tab-add" hidden>
         <form id="code-form" class="form" novalidate>
           <div class="form__group">
-            <label class="form__label" for="code-input">Código de descuento <span class="form__required" aria-hidden="true">*</span></label>
-            <input
-              type="text"
-              id="code-input"
-              class="form__input"
-              placeholder="Ej: 183410766341"
-              autocomplete="off"
-              required
-            >
-            <p id="code-validation" class="code-validation" hidden aria-live="polite"></p>
+            <label class="form__label" for="code-input">Código <span class="form__required">*</span></label>
+            <input type="text" id="code-input" class="form__input" placeholder="Ej: 183410766341" autocomplete="off" inputmode="numeric" required>
           </div>
-
           <div class="form__group">
-            <label class="form__label" for="seats-input">Número de butacas <span class="form__required" aria-hidden="true">*</span></label>
-            <input
-              type="text"
-              id="seats-input"
-              class="form__input"
-              inputmode="numeric"
-              pattern="[0-9]*"
-              placeholder="Ej: 2"
-              required
-            >
+            <label class="form__label" for="seats-input">Butacas <span class="form__required">*</span></label>
+            <input type="text" id="seats-input" class="form__input" inputmode="numeric" pattern="[0-9]*" placeholder="Ej: 2" required>
           </div>
-
           <div class="form__group">
-            <span class="form__label" id="date-label">Fecha de creación <span class="form__required" aria-hidden="true">*</span></span>
-            <div class="datepicker" id="datepicker">
-              <button
-                type="button"
-                class="datepicker__trigger"
-                id="date-trigger"
-                aria-labelledby="date-label"
-                aria-required="true"
-                aria-expanded="false"
-                aria-controls="date-calendar"
-              >
-                <span id="date-trigger-text"></span>
-                <svg class="datepicker__icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                  <path d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 4v1h8V6H6z"/>
-                </svg>
-              </button>
-              <div class="datepicker__calendar" id="date-calendar" hidden>
-                <div class="datepicker__nav">
-                  <button type="button" class="datepicker__nav-btn" id="date-prev" aria-label="Mes anterior">‹</button>
-                  <span class="datepicker__month" id="date-month-label"></span>
-                  <button type="button" class="datepicker__nav-btn" id="date-next" aria-label="Mes siguiente">›</button>
-                </div>
-                <div class="datepicker__weekdays" aria-hidden="true">
-                  <span>L</span><span>M</span><span>X</span><span>J</span><span>V</span><span>S</span><span>D</span>
-                </div>
-                <div class="datepicker__grid" id="date-grid" role="grid"></div>
-                <button type="button" class="datepicker__today" id="date-today">Ir a hoy</button>
-              </div>
-            </div>
-            <p class="form__hint">Por defecto es hoy. Puedes elegir una fecha pasada para códigos antiguos.</p>
+            <label class="form__label" for="date-input">Fecha de creación <span class="form__required">*</span></label>
+            <input type="date" id="date-input" class="form__input" required>
+            <p class="form__hint">Sin validación remota en la web. La extensión Firefox sí comprueba compraentradas.</p>
           </div>
-
           <div class="form__actions">
             <button type="button" class="btn btn--ghost" id="clear-form-btn">Limpiar</button>
             <button type="submit" class="btn btn--primary" id="submit-btn">Guardar</button>
@@ -218,9 +136,7 @@
     </div>
   </div>
 
-  <script src="firebase-config.js"></script>
-  <script src="sync.js"></script>
   <script src="barcode.js"></script>
-  <script src="popup.js"></script>
+  <script type="module" src="app.js"></script>
 </body>
 </html>

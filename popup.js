@@ -36,10 +36,17 @@ const formMessage = document.getElementById("form-message");
 const barcodeOverlay = document.getElementById("barcode-overlay");
 const barcodeOverlaySvg = document.getElementById("barcode-overlay-svg");
 const barcodeOverlayClose = document.getElementById("barcode-overlay-close");
+const viewLogin = document.getElementById("view-login");
+const viewApp = document.getElementById("view-app");
+const loginBtn = document.getElementById("login-btn");
+const logoutBtn = document.getElementById("logout-btn");
+const loginMessage = document.getElementById("login-message");
+const authEmail = document.getElementById("auth-email");
 
 let activeTabId = "list";
 let listSort = "expiry";
 let listSortDir = "asc";
+let authSession = null;
 
 let validationState = { status: "idle", code: "" };
 let validationRequestId = 0;
@@ -365,6 +372,8 @@ async function saveCodes(codes) {
 }
 
 async function saveCode(code, createdAt, seats, pendingActivation = false) {
+  if (!authSession) return false;
+
   const expiresAt = addDays(createdAt, VALIDITY_DAYS);
   const codes = await getCodes();
   const normalized = code.trim();
@@ -379,21 +388,38 @@ async function saveCode(code, createdAt, seats, pendingActivation = false) {
   }
   codes.push(entry);
   await saveCodes(codes);
+  try {
+    await upsertRemoteCode(entry);
+  } catch {
+    /* cache kept; retry on next sync */
+  }
   return true;
 }
 
-async function deleteCode(index) {
+async function deleteCodeByValue(code) {
+  if (!authSession) return;
+
+  const normalized = code.trim();
   const codes = await getCodes();
-  codes.splice(index, 1);
-  await saveCodes(codes);
+  const next = codes.filter((item) => item.code.trim() !== normalized);
+  if (next.length === codes.length) return;
+  try {
+    await deleteRemoteCode(normalized);
+  } catch {
+    showListMessage("No se pudo borrar en la nube.", "error");
+    return;
+  }
+  await saveCodes(next);
 }
 
 async function activateReadyCodes(codes) {
   let changed = false;
+  const activated = [];
   const updated = codes.map((item) => {
     if (item.pendingActivation && getDaysSince(item.createdAt) >= ACTIVATION_WAIT_DAYS) {
       changed = true;
       const { pendingActivation, ...rest } = item;
+      activated.push(rest);
       return rest;
     }
     return item;
@@ -401,6 +427,15 @@ async function activateReadyCodes(codes) {
 
   if (changed) {
     await saveCodes(updated);
+    if (authSession) {
+      for (const item of activated) {
+        try {
+          await upsertRemoteCode(item);
+        } catch {
+          /* ignore */
+        }
+      }
+    }
   }
 
   return updated;
@@ -411,6 +446,18 @@ async function purgeExpired() {
   const active = codes.filter((item) => getDaysRemaining(item.expiresAt) > 0);
   if (active.length !== codes.length) {
     await saveCodes(active);
+    if (authSession) {
+      const kept = new Set(active.map((item) => item.code.trim()));
+      for (const item of codes) {
+        if (!kept.has(item.code.trim())) {
+          try {
+            await deleteRemoteCode(item.code);
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+    }
   }
   return activateReadyCodes(active);
 }
@@ -505,12 +552,14 @@ function getCardUrgency(daysRemaining, waiting) {
 
 const SORT_ICON_PATHS = {
   expiry: {
-    asc: "M129-276q-86-86-86-209t86-209q86-86 209-86t209 86q86 86 86 209t-86 209q-86 86-209 86t-209-86Zm663 116L663-289l42-42 56 56v-525h60v526l57-57 42 42-128 129ZM421-354l41-41-94-94v-149h-60v172l113 112Z",
-    desc: "M129-276q-86-86-86-209t86-209q86-86 209-86t209 86q86 86 86 209t-86 209q-86 86-209 86t-209-86Zm633 116v-526l-57 57-42-42 129-129 128 129-42 42-56-56v525h-60ZM421-354l41-41-94-94v-149h-60v172l113 112Z",
+    // schedule (asc) / history (desc)
+    asc: "M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm0 18c-4.4 0-8-3.6-8-8s3.6-8 8-8 8 3.6 8 8-3.6 8-8 8zm.5-13H11v6l5.2 3.2.8-1.3-4.5-2.7V7z",
+    desc: "M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z",
   },
   seats: {
-    asc: "M474-486q26-32 38.5-66t12.5-79q0-45-12.5-79T474-776q76-17 133.5 23T665-631q0 82-57.5 122T474-486Zm216 326v-94q0-51-26-95t-90-74q173 22 236.5 64T874-254v94H690Zm270-389H700v-60h260v60Zm-753 26q-42-42-42-108t42-108q42-42 108-42t108 42q42 42 42 108t-42 108q-42 42-108 42t-108-42ZM0-160v-94q0-35 18.5-63.5T68-360q72-32 128.5-46T315-420q62 0 118 14t128 46q31 14 50 42.5t19 63.5v94H0Z",
-    desc: "M474-486q26-32 38.5-66t12.5-79q0-45-12.5-79T474-776q76-17 133.5 23T665-631q0 82-57.5 122T474-486Zm216 326v-94q0-51-26-95t-90-74q173 22 236.5 64T874-254v94H690Zm110-289v-100H700v-60h100v-100h60v100h100v60H860v100h-60Zm-593-74q-42-42-42-108t42-108q42-42 108-42t108 42q42 42 42 108t-42 108q-42 42-108 42t-108-42ZM0-160v-94q0-35 18.5-63.5T68-360q72-32 128.5-46T315-420q62 0 118 14t128 46q31 14 50 42.5t19 63.5v94H0Z",
+    // event_seat (asc) / person_add (desc)
+    asc: "M4 18v3h3v-3h10v3h3v-6H4zm15-8h3v3h-3zM2 10h3v3H2zm15 3H7V5c0-1.1.9-2 2-2h6c1.1 0 2 .9 2 2z",
+    desc: "M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z",
   },
 };
 
@@ -621,7 +670,7 @@ const ICONS = {
   pause: "M6 19h4V5H6v14zm8-14v14h4V5h-4z",
 };
 
-function createCard(item, index) {
+function createCard(item) {
   const daysRemaining = getDaysRemaining(item.expiresAt);
   const waiting = isWaitingForActivation(item);
   const urgency = getCardUrgency(daysRemaining, waiting);
@@ -706,7 +755,7 @@ function createCard(item, index) {
   deleteBtn.title = "Eliminar código";
   deleteBtn.textContent = "Eliminar";
   deleteBtn.addEventListener("click", async () => {
-    await deleteCode(index);
+    await deleteCodeByValue(item.code);
     await renderList();
   });
 
@@ -727,14 +776,13 @@ async function renderList() {
 
   emptyList.hidden = true;
 
-  const entries = codes.map((item, index) => ({
+  const entries = codes.map((item) => ({
     item,
-    index,
     daysRemaining: getDaysRemaining(item.expiresAt),
   }));
 
-  sortCodes(entries).forEach(({ item, index }) => {
-    codeList.appendChild(createCard(item, index));
+  sortCodes(entries).forEach(({ item }) => {
+    codeList.appendChild(createCard(item));
   });
 }
 
@@ -796,6 +844,8 @@ function parseImportPayload(data) {
 }
 
 async function exportCodes() {
+  if (!authSession) return;
+
   const codes = await getCodes();
 
   if (codes.length === 0) {
@@ -821,6 +871,8 @@ async function exportCodes() {
 }
 
 async function importCodes(file) {
+  if (!authSession) return;
+
   let data;
 
   try {
@@ -840,6 +892,7 @@ async function importCodes(file) {
   const existing = await getCodes();
   const existingCodes = new Set(existing.map((item) => item.code.trim()));
   const merged = [...existing];
+  const newlyAdded = [];
   let added = 0;
   let skipped = 0;
   let invalid = 0;
@@ -859,6 +912,7 @@ async function importCodes(file) {
 
     existingCodes.add(entry.code);
     merged.push(entry);
+    newlyAdded.push(entry);
     added += 1;
   }
 
@@ -874,6 +928,13 @@ async function importCodes(file) {
   }
 
   await saveCodes(merged);
+  try {
+    for (const entry of newlyAdded) {
+      await upsertRemoteCode(entry);
+    }
+  } catch {
+    /* cache kept */
+  }
   await renderList();
 
   const parts = [`${added} importado${added === 1 ? "" : "s"}`];
@@ -890,6 +951,124 @@ function showFormMessage(text, type = "success") {
     formMessage.hidden = true;
   }, 2500);
 }
+
+// ─── Auth / views ───────────────────────────────────────────────────────────
+
+function showLoginMessage(text, type = "info") {
+  loginMessage.textContent = text;
+  loginMessage.className = `login-message login-message--${type}`;
+  loginMessage.hidden = false;
+}
+
+function hideLoginMessage() {
+  loginMessage.hidden = true;
+}
+
+function showView(name) {
+  const isApp = name === "app";
+  viewLogin.hidden = isApp;
+  viewApp.hidden = !isApp;
+}
+
+async function clearCodesCache() {
+  await browser.storage.local.remove([STORAGE_KEY, DRAFT_KEY]);
+}
+
+function displayNameFromEmail(email) {
+  if (!email) return "";
+  const at = email.indexOf("@");
+  return at === -1 ? email : email.slice(0, at);
+}
+
+function updateAuthChrome() {
+  authEmail.textContent = displayNameFromEmail(authSession?.email);
+  authEmail.title = authSession?.email || "";
+  loginBtn.disabled = false;
+  logoutBtn.disabled = false;
+}
+
+async function enterApp() {
+  showView("app");
+  updateAuthChrome();
+  updateSortButtons();
+  await loadFormDraft();
+  try {
+    await syncCodesWithCloud(getCodes, saveCodes);
+  } catch {
+    /* use session cache */
+  }
+  await renderList();
+}
+
+async function leaveApp() {
+  await signOut();
+  authSession = null;
+  await clearCodesCache();
+  codeList.innerHTML = "";
+  clearForm();
+  showView("login");
+  updateAuthChrome();
+  hideLoginMessage();
+}
+
+async function refreshAuthState() {
+  authSession = await getValidSession();
+  updateAuthChrome();
+}
+
+loginBtn.addEventListener("click", async () => {
+  loginBtn.disabled = true;
+  showLoginMessage("Completa el login en la ventana de Google…");
+  try {
+    authSession = await signInWithGoogle();
+    hideLoginMessage();
+    await enterApp();
+    showListMessage("Sincronizado con tu cuenta.");
+  } catch (err) {
+    console.error(err);
+    await refreshAuthState();
+    if (authSession) {
+      hideLoginMessage();
+      await enterApp();
+      showListMessage("Sincronizado con tu cuenta.");
+      return;
+    }
+    const msg = String(err?.message || err);
+    if (msg.includes("redirect") || msg.includes("invalid_request") || msg.includes("400")) {
+      const uri = await getAuthRedirectUri();
+      showLoginMessage(`URI OAuth (Google Cloud): ${uri}`, "error");
+    } else if (msg === "User cancelled" || msg.includes("canceled") || msg.includes("cancelled")) {
+      showLoginMessage("Inicio de sesión cancelado.", "error");
+    } else {
+      showLoginMessage("Si cerraste el popup, vuelve a abrirlo tras el login.", "error");
+    }
+  } finally {
+    loginBtn.disabled = false;
+  }
+});
+
+logoutBtn.addEventListener("click", async () => {
+  logoutBtn.disabled = true;
+  try {
+    await leaveApp();
+  } finally {
+    logoutBtn.disabled = false;
+  }
+});
+
+browser.storage.onChanged.addListener(async (changes, area) => {
+  if (area !== "local" || !changes.authSession) return;
+  const next = changes.authSession.newValue || null;
+  if (next?.idToken && !authSession) {
+    authSession = await getValidSession();
+    if (authSession) await enterApp();
+  } else if (!next && authSession) {
+    authSession = null;
+    await clearCodesCache();
+    showView("login");
+    updateAuthChrome();
+  }
+});
 
 // ─── Events ─────────────────────────────────────────────────────────────────
 
@@ -948,7 +1127,9 @@ seatsInput.addEventListener("paste", (e) => {
   saveFormDraft();
 });
 
-window.addEventListener("pagehide", saveFormDraft);
+window.addEventListener("pagehide", () => {
+  if (authSession) saveFormDraft();
+});
 
 dateTrigger.addEventListener("click", () => toggleCalendar());
 
@@ -980,6 +1161,7 @@ clearFormBtn.addEventListener("click", clearForm);
 
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
+  if (!authSession) return;
 
   const code = codeInput.value.trim();
   const createdAt = getSelectedDate();
@@ -1038,7 +1220,11 @@ form.addEventListener("submit", async (e) => {
 // ─── Init ───────────────────────────────────────────────────────────────────
 
 document.addEventListener("DOMContentLoaded", async () => {
-  updateSortButtons();
-  await loadFormDraft();
-  await renderList();
+  await refreshAuthState();
+  if (authSession) {
+    await enterApp();
+  } else {
+    await clearCodesCache();
+    showView("login");
+  }
 });
