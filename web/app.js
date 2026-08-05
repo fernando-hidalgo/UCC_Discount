@@ -22,6 +22,7 @@ const VALIDATION_DEBOUNCE_MS = 500;
 const CACHE_KEY = "ucc_codes_cache";
 const TICKETS_CACHE_KEY = "ucc_tickets_cache";
 const SORT_KEY = "ucc_list_sort";
+const TICKET_SORT_KEY = "ucc_ticket_sort";
 
 const viewLogin = document.getElementById("view-login");
 const viewApp = document.getElementById("view-app");
@@ -54,10 +55,8 @@ const emptyList = document.getElementById("empty-list");
 const ticketList = document.getElementById("ticket-list");
 const emptyTickets = document.getElementById("empty-tickets");
 const ticketsMessage = document.getElementById("tickets-message");
-const sortButtons = document.querySelectorAll(".sort-toggle__btn[data-sort]");
-const exportBtn = document.getElementById("export-btn");
-const importBtn = document.getElementById("import-btn");
-const importInput = document.getElementById("import-input");
+const sortButtons = document.querySelectorAll("#panel-list .sort-toggle__btn[data-sort]");
+const ticketSortBtn = document.getElementById("ticket-sort-btn");
 const listMessage = document.getElementById("list-message");
 const formMessage = document.getElementById("form-message");
 const barcodeOverlay = document.getElementById("barcode-overlay");
@@ -74,12 +73,33 @@ let codes = [];
 let tickets = [];
 let listSort = "expiry";
 let listSortDir = "asc";
+let ticketSortDir = "asc";
 let validationState = { status: "idle", code: "" };
 let validationRequestId = 0;
 let validationDebounceTimer = null;
 let submitBusy = false;
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
+
+function setBarcodeOverlaySvg(code) {
+  barcodeOverlaySvg.replaceChildren();
+  const doc = new DOMParser().parseFromString(renderBarcodeSvg(code), "image/svg+xml");
+  const svg = doc.documentElement;
+  if (svg?.nodeName === "svg" && !doc.querySelector("parsererror")) {
+    barcodeOverlaySvg.appendChild(document.importNode(svg, true));
+  }
+}
+
+function openBarcodeOverlay(code) {
+  setBarcodeOverlaySvg(code);
+  barcodeOverlay.hidden = false;
+}
+
+function closeBarcodeOverlay() {
+  if (barcodeOverlay.hidden) return;
+  barcodeOverlay.hidden = true;
+  barcodeOverlaySvg.replaceChildren();
+}
 
 function showView(name) {
   const isApp = name === "app";
@@ -254,6 +274,21 @@ function saveSort() {
   localStorage.setItem(SORT_KEY, JSON.stringify({ field: listSort, dir: listSortDir }));
 }
 
+function loadTicketSort() {
+  try {
+    const raw = localStorage.getItem(TICKET_SORT_KEY);
+    if (!raw) return;
+    const stored = JSON.parse(raw);
+    ticketSortDir = stored.dir === "desc" ? "desc" : "asc";
+  } catch {
+    /* ignore */
+  }
+}
+
+function saveTicketSort() {
+  localStorage.setItem(TICKET_SORT_KEY, JSON.stringify({ dir: ticketSortDir }));
+}
+
 function activateTab(tabId) {
   tabButtons.forEach((btn) => {
     const active = tabId !== "add" && btn.dataset.tab === tabId;
@@ -306,6 +341,31 @@ function sortEntries(entries) {
     if (a.daysRemaining !== b.daysRemaining) return (a.daysRemaining - b.daysRemaining) * dir;
     return (a.item.seats - b.item.seats) * dir;
   });
+}
+
+const TICKET_SORT_LABELS = {
+  asc: "Fecha: más próxima primero",
+  desc: "Fecha: más lejana primero",
+};
+
+function updateTicketSortButton() {
+  if (!ticketSortBtn) return;
+  const arrowPath = ticketSortBtn.querySelector(".sort-toggle__arrow path");
+  ticketSortBtn.title = TICKET_SORT_LABELS[ticketSortDir];
+  ticketSortBtn.setAttribute("aria-label", ticketSortBtn.title);
+  if (arrowPath) arrowPath.setAttribute("d", SORT_ARROW_PATHS[ticketSortDir]);
+}
+
+function ticketSortKey(ticket) {
+  const d = parseShowtimeDate(ticket.showtime);
+  if (d) return d.getTime();
+  const saved = Date.parse(ticket.savedAt || "");
+  return Number.isFinite(saved) ? saved : 0;
+}
+
+function sortTickets(list) {
+  const dir = ticketSortDir === "asc" ? 1 : -1;
+  return [...list].sort((a, b) => (ticketSortKey(a) - ticketSortKey(b)) * dir);
 }
 
 function activateReady(list) {
@@ -429,10 +489,7 @@ function renderTickets() {
     return;
   }
   emptyTickets.hidden = true;
-  const sorted = [...tickets].sort((a, b) =>
-    String(b.savedAt || "").localeCompare(String(a.savedAt || "")),
-  );
-  sorted.forEach((ticket) => ticketList.appendChild(createTicketCard(ticket)));
+  sortTickets(tickets).forEach((ticket) => ticketList.appendChild(createTicketCard(ticket)));
 }
 
 function createCard(item) {
@@ -510,10 +567,7 @@ function createCard(item) {
   barcodeBtn.textContent = "Barras";
   barcodeBtn.disabled = waiting;
   if (!waiting) {
-    barcodeBtn.addEventListener("click", () => {
-      barcodeOverlaySvg.innerHTML = renderBarcodeSvg(item.code);
-      barcodeOverlay.hidden = false;
-    });
+    barcodeBtn.addEventListener("click", () => openBarcodeOverlay(item.code));
   }
 
   const deleteBtn = document.createElement("button");
@@ -807,7 +861,9 @@ async function enterApp(authUser) {
   authEmail.title = authUser.email || "";
   showView("app");
   loadSort();
+  loadTicketSort();
   updateSortButtons();
+  updateTicketSortButton();
   dateInput.value = formatDateForInput(new Date());
   dateInput.max = formatDateForInput(new Date());
   updateSubmit();
@@ -886,6 +942,13 @@ sortButtons.forEach((btn) => {
     updateSortButtons();
     renderList();
   });
+});
+
+ticketSortBtn?.addEventListener("click", () => {
+  ticketSortDir = ticketSortDir === "asc" ? "desc" : "asc";
+  saveTicketSort();
+  updateTicketSortButton();
+  renderTickets();
 });
 
 codeInput.addEventListener("input", () => {
@@ -983,88 +1046,9 @@ form.addEventListener("submit", async (e) => {
   showFormMessage(formMsg);
 });
 
-exportBtn.addEventListener("click", () => {
-  if (!user || codes.length === 0) {
-    showListMessage("No hay códigos para exportar.", "error");
-    return;
-  }
-  const payload = { version: 1, exportedAt: new Date().toISOString(), codes };
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `ucc-descuentos-${formatDateForInput(new Date())}.json`;
-  link.click();
-  URL.revokeObjectURL(url);
-  showListMessage(`${codes.length} exportado${codes.length === 1 ? "" : "s"}.`);
-});
-
-importBtn.addEventListener("click", () => importInput.click());
-
-importInput.addEventListener("change", async () => {
-  const file = importInput.files?.[0];
-  importInput.value = "";
-  if (!file || !user) return;
-
-  let data;
-  try {
-    data = JSON.parse(await file.text());
-  } catch {
-    showListMessage("JSON inválido.", "error");
-    return;
-  }
-
-  const imported = Array.isArray(data) ? data : data?.codes;
-  if (!Array.isArray(imported) || imported.length === 0) {
-    showListMessage("Sin códigos en el archivo.", "error");
-    return;
-  }
-
-  const existing = new Set(codes.map((c) => c.code));
-  const newly = [];
-  for (const raw of imported) {
-    if (!raw?.code || !raw.createdAt) continue;
-    const seats = Number.parseInt(raw.seats, 10);
-    if (!Number.isInteger(seats) || seats < 1) continue;
-    const code = String(raw.code).trim();
-    if (existing.has(code)) continue;
-    existing.add(code);
-    const entry = {
-      code,
-      createdAt: raw.createdAt,
-      expiresAt: raw.expiresAt || addDays(raw.createdAt, VALIDITY_DAYS),
-      seats,
-    };
-    if (raw.pendingActivation) entry.pendingActivation = true;
-    newly.push(entry);
-  }
-
-  if (newly.length === 0) {
-    showListMessage("Nada nuevo que importar.", "error");
-    return;
-  }
-
-  const next = [...codes, ...newly];
-  saveCache(next);
-  renderList();
-  showListMessage(`${newly.length} importado${newly.length === 1 ? "" : "s"}.`);
-  try {
-    for (const entry of newly) await upsertCode(user.uid, entry);
-  } catch (err) {
-    console.error(err);
-    showListMessage("Import local OK; sync nube falló.", "error");
-  }
-});
-
-barcodeOverlayClose.addEventListener("click", () => {
-  barcodeOverlay.hidden = true;
-  barcodeOverlaySvg.innerHTML = "";
-});
+barcodeOverlayClose.addEventListener("click", closeBarcodeOverlay);
 barcodeOverlay.addEventListener("click", (e) => {
-  if (e.target === barcodeOverlay) {
-    barcodeOverlay.hidden = true;
-    barcodeOverlaySvg.innerHTML = "";
-  }
+  if (e.target === barcodeOverlay) closeBarcodeOverlay();
 });
 
 ticketOverlayClose.addEventListener("click", closeTicketOverlay);
@@ -1073,10 +1057,7 @@ ticketOverlay.addEventListener("click", (e) => {
 });
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
-  if (!barcodeOverlay.hidden) {
-    barcodeOverlay.hidden = true;
-    barcodeOverlaySvg.innerHTML = "";
-  }
+  closeBarcodeOverlay();
   closeTicketOverlay();
 });
 

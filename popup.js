@@ -2,6 +2,7 @@ const STORAGE_KEY = "codes";
 const TICKETS_KEY = "tickets";
 const DRAFT_KEY = "formDraft";
 const SORT_KEY = "listSort";
+const TICKET_SORT_KEY = "ticketSort";
 const VALIDITY_DAYS = 59;
 const WARNING_DAYS = 5;
 const CRITICAL_DAYS = 2;
@@ -31,11 +32,9 @@ const emptyList = document.getElementById("empty-list");
 const ticketList = document.getElementById("ticket-list");
 const emptyTickets = document.getElementById("empty-tickets");
 const ticketsMessage = document.getElementById("tickets-message");
-const sortButtons = document.querySelectorAll(".sort-toggle__btn[data-sort]");
-const exportBtn = document.getElementById("export-btn");
-const importBtn = document.getElementById("import-btn");
+const sortButtons = document.querySelectorAll("#panel-list .sort-toggle__btn[data-sort]");
 const addCodeBtn = document.getElementById("add-code-btn");
-const importInput = document.getElementById("import-input");
+const ticketSortBtn = document.getElementById("ticket-sort-btn");
 const listMessage = document.getElementById("list-message");
 const formMessage = document.getElementById("form-message");
 const barcodeOverlay = document.getElementById("barcode-overlay");
@@ -58,6 +57,7 @@ const authEmail = document.getElementById("auth-email");
 let activeTabId = "list";
 let listSort = "expiry";
 let listSortDir = "asc";
+let ticketSortDir = "asc";
 let authSession = null;
 
 let validationState = { status: "idle", code: "" };
@@ -268,6 +268,14 @@ function formatDateForInput(date) {
 function parseLocalDate(dateStr) {
   const [y, m, d] = dateStr.split("-").map(Number);
   return new Date(y, m - 1, d);
+}
+
+/** Showtime from compraentradas: "17/06/2026 - 19:30 - Sala 3". */
+function parseShowtimeDate(showtime) {
+  const m = String(showtime || "").match(/(\d{2})\/(\d{2})\/(\d{4})/);
+  if (!m) return null;
+  const d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+  return Number.isNaN(d.getTime()) ? null : d;
 }
 
 let selectedDate = new Date();
@@ -507,10 +515,7 @@ async function renderTickets() {
   }
 
   emptyTickets.hidden = true;
-  const sorted = [...tickets].sort((a, b) =>
-    String(b.savedAt || "").localeCompare(String(a.savedAt || "")),
-  );
-  sorted.forEach((ticket) => ticketList.appendChild(createTicketCard(ticket)));
+  sortTickets(tickets).forEach((ticket) => ticketList.appendChild(createTicketCard(ticket)));
 }
 
 async function saveCode(code, createdAt, seats, pendingActivation = false) {
@@ -629,13 +634,17 @@ async function saveFormDraft() {
 }
 
 async function loadFormDraft() {
-  const result = await browser.storage.local.get([DRAFT_KEY, SORT_KEY]);
+  const result = await browser.storage.local.get([DRAFT_KEY, SORT_KEY, TICKET_SORT_KEY]);
   const draft = result[DRAFT_KEY];
 
   if (result[SORT_KEY]) {
     loadSortPrefs(result[SORT_KEY]);
     updateSortButtons();
   }
+  if (result[TICKET_SORT_KEY]) {
+    loadTicketSortPrefs(result[TICKET_SORT_KEY]);
+  }
+  updateTicketSortButton();
 
   if (!draft) {
     initDate();
@@ -720,6 +729,7 @@ function updateSortButtons() {
 async function saveSortPrefs() {
   await browser.storage.local.set({
     [SORT_KEY]: { field: listSort, dir: listSortDir },
+    [TICKET_SORT_KEY]: { dir: ticketSortDir },
   });
 }
 
@@ -734,6 +744,35 @@ function loadSortPrefs(stored) {
 
   listSort = stored.field === "seats" ? "seats" : "expiry";
   listSortDir = stored.dir === "desc" ? "desc" : "asc";
+}
+
+function loadTicketSortPrefs(stored) {
+  ticketSortDir = stored?.dir === "desc" ? "desc" : "asc";
+}
+
+const TICKET_SORT_LABELS = {
+  asc: "Fecha: más próxima primero",
+  desc: "Fecha: más lejana primero",
+};
+
+function updateTicketSortButton() {
+  if (!ticketSortBtn) return;
+  const arrowPath = ticketSortBtn.querySelector(".sort-toggle__arrow path");
+  ticketSortBtn.title = TICKET_SORT_LABELS[ticketSortDir];
+  ticketSortBtn.setAttribute("aria-label", ticketSortBtn.title);
+  if (arrowPath) arrowPath.setAttribute("d", SORT_ARROW_PATHS[ticketSortDir]);
+}
+
+function ticketSortKey(ticket) {
+  const d = parseShowtimeDate(ticket.showtime);
+  if (d) return d.getTime();
+  const saved = Date.parse(ticket.savedAt || "");
+  return Number.isFinite(saved) ? saved : 0;
+}
+
+function sortTickets(list) {
+  const dir = ticketSortDir === "asc" ? 1 : -1;
+  return [...list].sort((a, b) => (ticketSortKey(a) - ticketSortKey(b)) * dir);
 }
 
 function sortCodes(entries) {
@@ -948,136 +987,6 @@ function showListMessage(text, type = "success") {
   }, 3000);
 }
 
-function normalizeImportedEntry(raw) {
-  if (!raw || typeof raw.code !== "string") return null;
-
-  const code = raw.code.trim();
-  const createdAt = typeof raw.createdAt === "string" ? raw.createdAt : "";
-  const seats = Number.parseInt(raw.seats, 10);
-
-  if (!code || !createdAt || !Number.isInteger(seats) || seats < 1) return null;
-  if (isFutureDate(parseLocalDate(createdAt))) return null;
-
-  const entry = {
-    code,
-    createdAt,
-    expiresAt: typeof raw.expiresAt === "string" ? raw.expiresAt : addDays(createdAt, VALIDITY_DAYS),
-    seats,
-  };
-
-  if (raw.pendingActivation) {
-    entry.pendingActivation = true;
-  }
-
-  return entry;
-}
-
-function parseImportPayload(data) {
-  if (Array.isArray(data)) return data;
-  if (data && Array.isArray(data.codes)) return data.codes;
-  return null;
-}
-
-async function exportCodes() {
-  if (!authSession) return;
-
-  const codes = await getCodes();
-
-  if (codes.length === 0) {
-    showListMessage("No hay códigos para exportar.", "error");
-    return;
-  }
-
-  const payload = {
-    version: 1,
-    exportedAt: new Date().toISOString(),
-    codes,
-  };
-
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `ucc-descuentos-${formatDateForInput(new Date())}.json`;
-  link.click();
-  URL.revokeObjectURL(url);
-
-  showListMessage(`${codes.length} código${codes.length === 1 ? "" : "s"} exportado${codes.length === 1 ? "" : "s"}.`);
-}
-
-async function importCodes(file) {
-  if (!authSession) return;
-
-  let data;
-
-  try {
-    data = JSON.parse(await file.text());
-  } catch {
-    showListMessage("El archivo no es un JSON válido.", "error");
-    return;
-  }
-
-  const imported = parseImportPayload(data);
-
-  if (!imported || imported.length === 0) {
-    showListMessage("No se encontraron códigos en el archivo.", "error");
-    return;
-  }
-
-  const existing = await getCodes();
-  const existingCodes = new Set(existing.map((item) => item.code.trim()));
-  const merged = [...existing];
-  const newlyAdded = [];
-  let added = 0;
-  let skipped = 0;
-  let invalid = 0;
-
-  for (const raw of imported) {
-    const entry = normalizeImportedEntry(raw);
-
-    if (!entry) {
-      invalid += 1;
-      continue;
-    }
-
-    if (existingCodes.has(entry.code)) {
-      skipped += 1;
-      continue;
-    }
-
-    existingCodes.add(entry.code);
-    merged.push(entry);
-    newlyAdded.push(entry);
-    added += 1;
-  }
-
-  if (added === 0) {
-    const parts = [];
-    if (skipped) parts.push(`${skipped} duplicado${skipped === 1 ? "" : "s"}`);
-    if (invalid) parts.push(`${invalid} inválido${invalid === 1 ? "" : "s"}`);
-    showListMessage(
-      parts.length ? `No se importó nada (${parts.join(", ")}).` : "No se importó ningún código.",
-      "error",
-    );
-    return;
-  }
-
-  await saveCodes(merged);
-  try {
-    for (const entry of newlyAdded) {
-      await upsertRemoteCode(entry);
-    }
-  } catch {
-    /* cache kept */
-  }
-  await renderList();
-
-  const parts = [`${added} importado${added === 1 ? "" : "s"}`];
-  if (skipped) parts.push(`${skipped} duplicado${skipped === 1 ? "" : "s"} omitido${skipped === 1 ? "" : "s"}`);
-  if (invalid) parts.push(`${invalid} inválido${invalid === 1 ? "" : "s"}`);
-  showListMessage(parts.join(". ") + ".");
-}
-
 function showFormMessage(text, type = "success") {
   formMessage.textContent = text;
   formMessage.className = `form-message form-message--${type}`;
@@ -1201,8 +1110,9 @@ logoutBtn.addEventListener("click", async () => {
 
 browser.storage.onChanged.addListener(async (changes, area) => {
   if (area !== "local") return;
-  if (changes.tickets && authSession && !viewApp.hidden) {
-    await renderTickets();
+  if (authSession && !viewApp.hidden) {
+    if (changes.codes) await renderList();
+    if (changes.tickets) await renderTickets();
   }
   if (!changes.authSession) return;
   const next = changes.authSession.newValue || null;
@@ -1243,22 +1153,17 @@ sortButtons.forEach((btn) => {
   });
 });
 
-exportBtn.addEventListener("click", exportCodes);
+ticketSortBtn?.addEventListener("click", async () => {
+  ticketSortDir = ticketSortDir === "asc" ? "desc" : "asc";
+  updateTicketSortButton();
+  await saveSortPrefs();
+  await renderTickets();
+});
 
 addCodeBtn.addEventListener("click", () => {
   toggleCalendar(false);
   activateTab("add");
   codeInput.focus();
-});
-
-importBtn.addEventListener("click", () => {
-  importInput.click();
-});
-
-importInput.addEventListener("change", async () => {
-  const file = importInput.files?.[0];
-  importInput.value = "";
-  if (file) await importCodes(file);
 });
 
 codeInput.addEventListener("input", () => {

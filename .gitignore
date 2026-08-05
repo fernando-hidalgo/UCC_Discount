@@ -2,4 +2,6 @@ firebase-config.js
 web/firebase-config.js
 .firebase/
 ucc-discount-*.zip
+ucc_manager-*.zip
 dist/
+web-ext-artifacts/
