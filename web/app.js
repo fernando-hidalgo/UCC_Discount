@@ -191,11 +191,28 @@ function activateTab(tabId) {
   });
 }
 
+const SORT_ARROW_PATHS = {
+  asc: "M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z",
+  desc: "M20 12l-1.41-1.41L13 16.17V4h-2v12.17l-5.58-5.59L4 12l8 8 8-8z",
+};
+
+const SORT_LABELS = {
+  expiry: { asc: "Caducidad: menor a mayor", desc: "Caducidad: mayor a menor" },
+  seats: { asc: "Butacas: menor a mayor", desc: "Butacas: mayor a menor" },
+};
+
 function updateSortButtons() {
   sortButtons.forEach((btn) => {
-    const active = btn.dataset.sort === listSort;
+    const field = btn.dataset.sort;
+    const active = field === listSort;
+    const dir = active ? listSortDir : "asc";
+    const arrowPath = btn.querySelector(".sort-toggle__arrow path");
+
     btn.classList.toggle("sort-toggle__btn--active", active);
     btn.setAttribute("aria-pressed", String(active));
+    btn.title = SORT_LABELS[field][dir];
+    btn.setAttribute("aria-label", btn.title);
+    if (arrowPath) arrowPath.setAttribute("d", SORT_ARROW_PATHS[dir]);
   });
 }
 

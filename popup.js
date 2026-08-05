@@ -559,17 +559,9 @@ function getCardUrgency(daysRemaining, waiting) {
   return "normal";
 }
 
-const SORT_ICON_PATHS = {
-  expiry: {
-    // schedule (asc) / history (desc)
-    asc: "M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm0 18c-4.4 0-8-3.6-8-8s3.6-8 8-8 8 3.6 8 8-3.6 8-8 8zm.5-13H11v6l5.2 3.2.8-1.3-4.5-2.7V7z",
-    desc: "M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z",
-  },
-  seats: {
-    // event_seat (asc) / person_add (desc)
-    asc: "M4 18v3h3v-3h10v3h3v-6H4zm15-8h3v3h-3zM2 10h3v3H2zm15 3H7V5c0-1.1.9-2 2-2h6c1.1 0 2 .9 2 2z",
-    desc: "M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z",
-  },
+const SORT_ARROW_PATHS = {
+  asc: "M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z",
+  desc: "M20 12l-1.41-1.41L13 16.17V4h-2v12.17l-5.58-5.59L4 12l8 8 8-8z",
 };
 
 const SORT_LABELS = {
@@ -582,12 +574,13 @@ function updateSortButtons() {
     const field = btn.dataset.sort;
     const isActive = field === listSort;
     const dir = isActive ? listSortDir : "asc";
+    const arrowPath = btn.querySelector(".sort-toggle__arrow path");
 
     btn.classList.toggle("sort-toggle__btn--active", isActive);
     btn.setAttribute("aria-pressed", String(isActive));
-    btn.querySelector("path").setAttribute("d", SORT_ICON_PATHS[field][dir]);
     btn.title = SORT_LABELS[field][dir];
     btn.setAttribute("aria-label", btn.title);
+    if (arrowPath) arrowPath.setAttribute("d", SORT_ARROW_PATHS[dir]);
   });
 }
 
