@@ -163,6 +163,40 @@ body {
   cursor: wait;
 }
 
+.btn--busy {
+  position: relative;
+  color: transparent !important;
+  pointer-events: none;
+}
+
+.btn--busy .btn__label {
+  visibility: hidden;
+}
+
+.btn__spinner {
+  display: none;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 1.1em;
+  height: 1.1em;
+  margin: -0.55em 0 0 -0.55em;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: btn-spin 0.7s linear infinite;
+}
+
+.btn--busy .btn__spinner {
+  display: block;
+}
+
+@keyframes btn-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .btn--ghost {
   background: #fff;
   color: var(--color-text-muted);
@@ -263,6 +297,26 @@ body {
   display: block;
 }
 
+.back-btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 0 12px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  cursor: pointer;
+}
+
+.back-btn:hover {
+  color: var(--color-accent);
+}
+
 .list-toolbar {
   display: flex;
   align-items: center;
@@ -340,6 +394,14 @@ body {
   cursor: pointer;
   padding: 0;
   flex-shrink: 0;
+}
+
+.toolbar-btn--text {
+  width: auto;
+  padding: 0 8px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .toolbar-icon {
@@ -570,6 +632,51 @@ body {
   line-height: 1.35;
 }
 
+.code-validation {
+  margin-top: 6px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  padding: 6px 8px;
+  border-radius: 6px;
+  line-height: 1.4;
+}
+
+.code-validation--loading {
+  color: var(--color-text-muted);
+  background: var(--color-pending-bg);
+}
+
+.code-validation--valid {
+  color: var(--color-success);
+  background: #f0fdf4;
+}
+
+.code-validation--not_yet_valid {
+  color: var(--color-pending);
+  background: var(--color-pending-bg);
+}
+
+.code-validation--invalid,
+.code-validation--expired,
+.code-validation--seats_redeemed,
+.code-validation--duplicate,
+.code-validation--error {
+  color: var(--color-danger);
+  background: var(--color-danger-bg);
+}
+
+.form__input--valid {
+  border-color: var(--color-success);
+}
+
+.form__input--pending {
+  border-color: var(--color-pending-border);
+}
+
+.form__input--invalid {
+  border-color: var(--color-danger);
+}
+
 .form__actions {
   display: flex;
   gap: 10px;
@@ -633,6 +740,48 @@ body {
 .barcode-overlay__svg svg {
   max-width: 100%;
   height: auto;
+}
+
+.ticket-overlay__panel {
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.ticket-overlay__meta {
+  margin: 0 0 12px;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  line-height: 1.4;
+}
+
+.ticket-overlay__codes {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.ticket-overlay__label {
+  margin: 8px 0 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text);
+  text-align: center;
+}
+
+.ticket-overlay__qr,
+.ticket-overlay__barcode {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  background: #fff;
+}
+
+.ticket-overlay__access {
+  margin: 4px 0 0;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  text-align: center;
 }
 
 /* ─── Desktop ─────────────────────────────────────────────────────────────── */

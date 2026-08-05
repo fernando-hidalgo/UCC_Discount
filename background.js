@@ -3,7 +3,8 @@ const MSG_EXPIRED = "han pasado más de 60 días";
 const MSG_NOT_YET = "24 horas después de la compra";
 const MSG_SEATS_REDEEMED = "ya se han canjeado todas las butacas";
 const MSG_INVALID = "La referencia no es válida";
-const AUTH_KEY = "authSession";
+const TICKETS_KEY = "tickets";
+/* AUTH_KEY + getRedirectUri come from sync.js (loaded before this script) */
 
 async function fetchValidationBody(code) {
   const url = `${VALIDATION_URL}?Referencia=${encodeURIComponent(code)}`;
@@ -52,12 +53,6 @@ function parseValidationResult(body) {
 async function validateCode(code) {
   const body = await fetchValidationBody(code);
   return parseValidationResult(body);
-}
-
-function getRedirectUri() {
-  const base = browser.identity.getRedirectURL();
-  const subdomain = new URL(base).hostname.split(".")[0];
-  return `http://127.0.0.1/mozoauth2/${subdomain}`;
 }
 
 function parseHashParams(redirectedTo) {
@@ -117,8 +112,49 @@ async function googleLaunchAndFirebaseSignIn() {
     refreshToken: data.refreshToken,
     expiresAt: Date.now() + Number(data.expiresIn || 3600) * 1000,
   };
-  await browser.storage.local.set({ [AUTH_KEY]: session });
+  await setAuthSession(session);
   return { uid: session.uid, email: session.email };
+}
+
+async function saveTicketFromPage(ticket) {
+  const session = await getValidSession();
+  if (!session) return { ok: false, error: "not_signed_in" };
+
+  const accessCode = String(ticket?.accessCode || "").trim();
+  if (!accessCode || !ticket?.qrDataUrl || !ticket?.barcodeDataUrl) {
+    return { ok: false, error: "invalid_ticket" };
+  }
+
+  const entry = {
+    accessCode,
+    referencia: String(ticket.referencia || "").trim(),
+    title: String(ticket.title || "").trim(),
+    showtime: String(ticket.showtime || "").trim(),
+    cinema: String(ticket.cinema || "").trim(),
+    seatsText: String(ticket.seatsText || "").trim(),
+    qrDataUrl: ticket.qrDataUrl,
+    barcodeDataUrl: ticket.barcodeDataUrl,
+    savedAt: ticket.savedAt || new Date().toISOString(),
+  };
+
+  const result = await browser.storage.local.get(TICKETS_KEY);
+  const tickets = result[TICKETS_KEY] || [];
+  const idx = tickets.findIndex((t) => t.accessCode.trim() === accessCode);
+  const created = idx === -1;
+  if (created) {
+    tickets.push(entry);
+  } else {
+    tickets[idx] = { ...tickets[idx], ...entry };
+  }
+  await browser.storage.local.set({ [TICKETS_KEY]: tickets });
+
+  try {
+    await upsertRemoteTicket(entry);
+  } catch {
+    /* local kept; retry on next sync */
+  }
+
+  return { ok: true, created };
 }
 
 browser.runtime.onMessage.addListener((message) => {
@@ -132,6 +168,12 @@ browser.runtime.onMessage.addListener((message) => {
     return googleLaunchAndFirebaseSignIn().catch((err) => {
       throw new Error(err?.message || String(err));
     });
+  }
+  if (message?.type === "save-ticket") {
+    return saveTicketFromPage(message.ticket).catch((err) => ({
+      ok: false,
+      error: err?.message || String(err),
+    }));
   }
   return undefined;
 });

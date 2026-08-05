@@ -1,0 +1,92 @@
+[debug] [2026-08-05T10:00:07.039Z] ----------------------------------------------------------------------
+[debug] [2026-08-05T10:00:07.040Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\Misco\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js deploy --only hosting --force
+[debug] [2026-08-05T10:00:07.041Z] CLI Version:   15.25.1
+[debug] [2026-08-05T10:00:07.041Z] Platform:      win32
+[debug] [2026-08-05T10:00:07.041Z] Node Version:  v24.13.0
+[debug] [2026-08-05T10:00:07.041Z] Detected Agent: cursor
+[debug] [2026-08-05T10:00:07.041Z] Time:          Wed Aug 05 2026 12:00:07 GMT+0200 (hora de verano de Europa central)
+[debug] [2026-08-05T10:00:07.041Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-08-05T10:00:07.975Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-08-05T10:00:07.975Z] > authorizing via signed-in user (fernan.hidalgo02@gmail.com)
+[debug] [2026-08-05T10:00:07.975Z] [iam] checking project ucc-discount for permissions ["firebase.projects.get","firebasehosting.sites.update"]
+[debug] [2026-08-05T10:00:07.982Z] Checked if tokens are valid: true, expires at: 1785925969596
+[debug] [2026-08-05T10:00:07.982Z] Checked if tokens are valid: true, expires at: 1785925969596
+[debug] [2026-08-05T10:00:07.982Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/ucc-discount:testIamPermissions [none]
+[debug] [2026-08-05T10:00:07.982Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/ucc-discount:testIamPermissions  x-goog-user-project=ucc-discount
+[debug] [2026-08-05T10:00:07.983Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/ucc-discount:testIamPermissions {"permissions":["firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2026-08-05T10:00:08.386Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/ucc-discount:testIamPermissions 200
+[debug] [2026-08-05T10:00:08.386Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/ucc-discount:testIamPermissions {"permissions":["firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2026-08-05T10:00:08.386Z] Checked if tokens are valid: true, expires at: 1785925969596
+[debug] [2026-08-05T10:00:08.386Z] Checked if tokens are valid: true, expires at: 1785925969596
+[debug] [2026-08-05T10:00:08.386Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/ucc-discount [none]
+[debug] [2026-08-05T10:00:08.742Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/ucc-discount 200
+[debug] [2026-08-05T10:00:08.742Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/ucc-discount {"projectId":"ucc-discount","projectNumber":"854690175498","displayName":"ucc-discount","name":"projects/ucc-discount","resources":{"hostingSite":"ucc-discount"},"state":"ACTIVE","labels":{"firebase":"enabled"},"etag":"1_c99637a1-37dc-49bf-a4f0-30efe1c97017"}
+[info] 
+[info] === Deploying to 'ucc-discount'...
+[info] 
+[info] i  deploying hosting 
+[debug] [2026-08-05T10:00:08.744Z] Checked if tokens are valid: true, expires at: 1785925969596
+[debug] [2026-08-05T10:00:08.744Z] Checked if tokens are valid: true, expires at: 1785925969596
+[debug] [2026-08-05T10:00:08.744Z] >>> [apiv2][query] GET https://firebasehosting.googleapis.com/v1beta1/projects/ucc-discount/sites/ucc-discount [none]
+[debug] [2026-08-05T10:00:09.808Z] <<< [apiv2][status] GET https://firebasehosting.googleapis.com/v1beta1/projects/ucc-discount/sites/ucc-discount 200
+[debug] [2026-08-05T10:00:09.808Z] <<< [apiv2][body] GET https://firebasehosting.googleapis.com/v1beta1/projects/ucc-discount/sites/ucc-discount {"name":"projects/ucc-discount/sites/ucc-discount","defaultUrl":"https://ucc-discount.web.app","type":"DEFAULT_SITE"}
+[debug] [2026-08-05T10:00:09.809Z] Checked if tokens are valid: true, expires at: 1785925969596
+[debug] [2026-08-05T10:00:09.809Z] Checked if tokens are valid: true, expires at: 1785925969596
+[debug] [2026-08-05T10:00:09.809Z] >>> [apiv2][query] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/ucc-discount/versions [none]
+[debug] [2026-08-05T10:00:09.809Z] >>> [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/ucc-discount/versions {"status":"CREATED","labels":{"deployment-tool":"cli-firebase"}}
+[debug] [2026-08-05T10:00:11.261Z] <<< [apiv2][status] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/ucc-discount/versions 200
+[debug] [2026-08-05T10:00:11.261Z] <<< [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/ucc-discount/versions {"name":"projects/854690175498/sites/ucc-discount/versions/c8c95caf2572243b","status":"CREATED","config":{},"labels":{"deployment-tool":"cli-firebase"}}
+[info] i  hosting[ucc-discount]: beginning deploy... 
+[info] i  hosting[ucc-discount]: found 9 files in web 
+[debug] [2026-08-05T10:00:11.269Z] [hosting] uploading with 200 concurrency
+[debug] [2026-08-05T10:00:11.274Z] Checked if tokens are valid: true, expires at: 1785925969596
+[debug] [2026-08-05T10:00:11.274Z] Checked if tokens are valid: true, expires at: 1785925969596
+[debug] [2026-08-05T10:00:11.274Z] [hosting] hash cache [d2Vi] stored for 9 files
+[debug] [2026-08-05T10:00:11.274Z] [hosting][hash queue][FINAL] {"max":2,"min":0,"avg":0.2222222222222222,"active":0,"complete":9,"success":9,"errored":0,"retried":0,"total":9,"elapsed":4}
+[debug] [2026-08-05T10:00:11.274Z] >>> [apiv2][query] POST https://firebasehosting.googleapis.com/v1beta1/projects/854690175498/sites/ucc-discount/versions/c8c95caf2572243b:populateFiles [none]
+[debug] [2026-08-05T10:00:11.275Z] >>> [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/854690175498/sites/ucc-discount/versions/c8c95caf2572243b:populateFiles {"files":{"/styles.css":"44522b45cc57f480c9d5affede7955892dd45ba9258b6e3483aa6a44e0a9fe02","/index.html":"43a4b34aa8b4aba05b4448c60504ac83df44b8a4a5ce57d4b174b74d97a7a83b","/icon-64.png":"993f085a4d1a499c0b2c6f091daf1c8b9a13b1a206353fd9391b23eabbad695f","/icon-48.png":"85b7f5fe5cc72989be19903c4be53e65a641ef3c38d44aa85521e33913fac452","/firebase.js":"1d0c536884b7b9b9ebcd1a304e174008c50324ef6f00f0842abfdf48b663aff3","/firebase-config.js.example":"cf0929561af32e03333d550979229ef0ee879f358a87b5a257623929414c96fe","/firebase-config.js":"773db26d94af532d471cd935eecd5dc704970ccdc0dd2415754717bc9303fca1","/barcode.js":"f8c7c4a1ccdcdba505460e1d064b35a1e472081de34768ddb9dd174a2fe60d85","/app.js":"0c892c7bb10f3e16f6201af474f34176cae9a1e21308b62a7c727a51064b901a"}}
+[debug] [2026-08-05T10:00:12.002Z] <<< [apiv2][status] POST https://firebasehosting.googleapis.com/v1beta1/projects/854690175498/sites/ucc-discount/versions/c8c95caf2572243b:populateFiles 200
+[debug] [2026-08-05T10:00:12.002Z] <<< [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/854690175498/sites/ucc-discount/versions/c8c95caf2572243b:populateFiles {"uploadRequiredHashes":["0c892c7bb10f3e16f6201af474f34176cae9a1e21308b62a7c727a51064b901a"],"uploadUrl":"https://upload-firebasehosting.googleapis.com/upload/sites/ucc-discount/versions/c8c95caf2572243b/files"}
+[debug] [2026-08-05T10:00:12.002Z] Checked if tokens are valid: true, expires at: 1785925969596
+[debug] [2026-08-05T10:00:12.002Z] Checked if tokens are valid: true, expires at: 1785925969596
+[debug] [2026-08-05T10:00:12.002Z] >>> [apiv2][query] POST https://upload-firebasehosting.googleapis.com/upload/sites/ucc-discount/versions/c8c95caf2572243b/files/0c892c7bb10f3e16f6201af474f34176cae9a1e21308b62a7c727a51064b901a [none]
+[debug] [2026-08-05T10:00:12.002Z] >>> [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/ucc-discount/versions/c8c95caf2572243b/files/0c892c7bb10f3e16f6201af474f34176cae9a1e21308b62a7c727a51064b901a [stream]
+[debug] [2026-08-05T10:00:12.003Z] [hosting][populate queue][FINAL] {"max":729,"min":729,"avg":729,"active":0,"complete":1,"success":1,"errored":0,"retried":0,"total":1,"elapsed":730}
+[debug] [2026-08-05T10:00:12.003Z] [hosting] uploads queued: 1
+[debug] [2026-08-05T10:00:13.136Z] <<< [apiv2][status] POST https://upload-firebasehosting.googleapis.com/upload/sites/ucc-discount/versions/c8c95caf2572243b/files/0c892c7bb10f3e16f6201af474f34176cae9a1e21308b62a7c727a51064b901a 200
+[debug] [2026-08-05T10:00:13.136Z] <<< [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/ucc-discount/versions/c8c95caf2572243b/files/0c892c7bb10f3e16f6201af474f34176cae9a1e21308b62a7c727a51064b901a [stream]
+[debug] [2026-08-05T10:00:13.136Z] [hosting][upload queue][FINAL] {"max":1134,"min":1134,"avg":1134,"active":0,"complete":1,"success":1,"errored":0,"retried":0,"total":1,"elapsed":1134}
+[info] i  hosting: upload complete 
+[info] +  hosting[ucc-discount]: file upload complete 
+[debug] [2026-08-05T10:00:13.136Z] [hosting] deploy completed after 1873ms
+[debug] [2026-08-05T10:00:13.136Z] [
+  {
+    "config": {
+      "public": "web",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "headers": [
+        {
+          "source": "**/*.@(js|css)",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache"
+            }
+          ]
+        }
+      ],
+      "site": "ucc-discount"
+    },
+    "version": "projects/854690175498/sites/ucc-discount/versions/c8c95caf2572243b"
+  }
+]
+[info] i  hosting[ucc-discount]: finalizing version... 
+[debug] [2026-08-05T10:00:13.137Z] Checked if tokens are valid: true, expires at: 1785925969596
+[debug] [2026-08-05T10:00:13.137Z] Checked if tokens are valid: true, expires at: 1785925969596
+[debug] [2026-08-05T10:00:13.137Z] >>> [apiv2][query] PATCH https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/ucc-discount/versions/c8c95caf2572243b updateMask=status%2Cconfig
+[debug] [2026-08-05T10:00:13.137Z] >>> [apiv2][body] PATCH https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/ucc-discount/versions/c8c95caf2572243b {"status":"FINALIZED","config":{"headers":[{"glob":"**/*.@(js|css)","headers":{"Cache-Control":"no-cache"}}]}}

@@ -18,6 +18,10 @@ import {
   deleteDoc,
   getDocs,
 } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
+import {
+  getFunctions,
+  httpsCallable,
+} from "https://www.gstatic.com/firebasejs/11.6.0/firebase-functions.js";
 import { FIREBASE_CONFIG } from "./firebase-config.js";
 
 const app = initializeApp(FIREBASE_CONFIG);
@@ -26,6 +30,7 @@ export const auth = initializeAuth(app, {
   popupRedirectResolver: browserPopupRedirectResolver,
 });
 export const db = getFirestore(app);
+const functions = getFunctions(app, "us-central1");
 const googleProvider = new GoogleAuthProvider();
 
 function isAppleMobile() {
@@ -55,6 +60,18 @@ export function signOut() {
 
 export function watchAuth(callback) {
   return onAuthStateChanged(auth, callback);
+}
+
+export async function validateCodeRemote(code) {
+  const fn = httpsCallable(functions, "validateCode");
+  const res = await fn({ code: String(code).trim() });
+  return res.data;
+}
+
+export async function fetchEntradaRemote(referencia) {
+  const fn = httpsCallable(functions, "fetchEntrada");
+  const res = await fn({ referencia: String(referencia).trim() });
+  return res.data;
 }
 
 function codesCol(uid) {
@@ -101,4 +118,58 @@ export function mergeRemoteMembership(local, remote) {
 export async function syncCodes(uid, local) {
   const remote = await pullCodes(uid);
   return mergeRemoteMembership(local, remote);
+}
+
+function ticketsCol(uid) {
+  return collection(db, "users", uid, "tickets");
+}
+
+export async function pullTickets(uid) {
+  const snap = await getDocs(ticketsCol(uid));
+  return snap.docs
+    .map((d) => {
+      const data = d.data();
+      if (!data?.accessCode) return null;
+      return {
+        accessCode: data.accessCode,
+        referencia: data.referencia || "",
+        title: data.title || "",
+        showtime: data.showtime || "",
+        cinema: data.cinema || "",
+        seatsText: data.seatsText || "",
+        qrDataUrl: data.qrDataUrl || "",
+        barcodeDataUrl: data.barcodeDataUrl || "",
+        savedAt: data.savedAt || "",
+      };
+    })
+    .filter(Boolean);
+}
+
+export async function upsertTicket(uid, ticket) {
+  const payload = {
+    accessCode: ticket.accessCode,
+    referencia: ticket.referencia || "",
+    title: ticket.title || "",
+    showtime: ticket.showtime || "",
+    cinema: ticket.cinema || "",
+    seatsText: ticket.seatsText || "",
+    qrDataUrl: ticket.qrDataUrl || "",
+    barcodeDataUrl: ticket.barcodeDataUrl || "",
+    savedAt: ticket.savedAt || "",
+  };
+  await setDoc(doc(ticketsCol(uid), codeDocId(ticket.accessCode)), payload);
+}
+
+export async function deleteTicketRemote(uid, accessCode) {
+  await deleteDoc(doc(ticketsCol(uid), codeDocId(accessCode)));
+}
+
+export function mergeRemoteTickets(local, remote) {
+  const localMap = new Map(local.map((i) => [i.accessCode.trim(), i]));
+  return remote.map((r) => localMap.get(r.accessCode.trim()) || r);
+}
+
+export async function syncTickets(uid, local) {
+  const remote = await pullTickets(uid);
+  return mergeRemoteTickets(local, remote);
 }

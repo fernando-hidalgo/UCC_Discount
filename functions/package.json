@@ -1,0 +1,13 @@
+{
+  "name": "ucc-discount-functions",
+  "description": "Callable proxies for compraentradas (validate + Entrada scrape)",
+  "engines": {
+    "node": "22"
+  },
+  "main": "index.js",
+  "private": true,
+  "dependencies": {
+    "firebase-admin": "^13.0.2",
+    "firebase-functions": "^6.3.0"
+  }
+}

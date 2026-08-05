@@ -6,13 +6,20 @@ import {
   upsertCode,
   deleteCodeRemote,
   syncCodes,
+  deleteTicketRemote,
+  syncTickets,
+  upsertTicket,
+  validateCodeRemote,
+  fetchEntradaRemote,
 } from "./firebase.js";
 
 const VALIDITY_DAYS = 59;
 const WARNING_DAYS = 5;
 const CRITICAL_DAYS = 2;
 const ACTIVATION_WAIT_DAYS = 2;
+const VALIDATION_DEBOUNCE_MS = 500;
 const CACHE_KEY = "ucc_codes_cache";
+const TICKETS_CACHE_KEY = "ucc_tickets_cache";
 const SORT_KEY = "ucc_list_sort";
 
 const viewLogin = document.getElementById("view-login");
@@ -25,12 +32,18 @@ const tabButtons = document.querySelectorAll(".tabs__btn");
 const panels = document.querySelectorAll(".panel");
 const form = document.getElementById("code-form");
 const codeInput = document.getElementById("code-input");
+const codeValidation = document.getElementById("code-validation");
 const seatsInput = document.getElementById("seats-input");
 const dateInput = document.getElementById("date-input");
 const submitBtn = document.getElementById("submit-btn");
 const clearFormBtn = document.getElementById("clear-form-btn");
+const addCodeBtn = document.getElementById("add-code-btn");
+const addBackBtn = document.getElementById("add-back-btn");
 const codeList = document.getElementById("code-list");
 const emptyList = document.getElementById("empty-list");
+const ticketList = document.getElementById("ticket-list");
+const emptyTickets = document.getElementById("empty-tickets");
+const ticketsMessage = document.getElementById("tickets-message");
 const sortButtons = document.querySelectorAll(".sort-toggle__btn[data-sort]");
 const exportBtn = document.getElementById("export-btn");
 const importBtn = document.getElementById("import-btn");
@@ -40,11 +53,21 @@ const formMessage = document.getElementById("form-message");
 const barcodeOverlay = document.getElementById("barcode-overlay");
 const barcodeOverlaySvg = document.getElementById("barcode-overlay-svg");
 const barcodeOverlayClose = document.getElementById("barcode-overlay-close");
+const ticketOverlay = document.getElementById("ticket-overlay");
+const ticketOverlayClose = document.getElementById("ticket-overlay-close");
+const ticketOverlayTitle = document.getElementById("ticket-overlay-title");
+const ticketOverlayQr = document.getElementById("ticket-overlay-qr");
+const ticketOverlayBarcode = document.getElementById("ticket-overlay-barcode");
 
 let user = null;
 let codes = [];
+let tickets = [];
 let listSort = "expiry";
 let listSortDir = "asc";
+let validationState = { status: "idle", code: "" };
+let validationRequestId = 0;
+let validationDebounceTimer = null;
+let submitBusy = false;
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
@@ -79,6 +102,15 @@ function showListMessage(text, type = "success") {
   }, 3000);
 }
 
+function showTicketsMessage(text, type = "success") {
+  ticketsMessage.textContent = text;
+  ticketsMessage.className = `list-message list-message--${type}`;
+  ticketsMessage.hidden = false;
+  setTimeout(() => {
+    ticketsMessage.hidden = true;
+  }, 3000);
+}
+
 function showFormMessage(text, type = "success") {
   formMessage.textContent = text;
   formMessage.className = `form-message form-message--${type}`;
@@ -104,6 +136,22 @@ function getToday() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   return today;
+}
+
+/** Showtime from compraentradas: "17/06/2026 - 19:30 - Sala 3". */
+function parseShowtimeDate(showtime) {
+  const m = String(showtime || "").match(/(\d{2})\/(\d{2})\/(\d{4})/);
+  if (!m) return null;
+  const [, dd, mm, yyyy] = m;
+  const d = new Date(Number(yyyy), Number(mm) - 1, Number(dd));
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function isShowtimePast(showtime) {
+  const d = parseShowtimeDate(showtime);
+  if (!d) return false;
+  d.setHours(0, 0, 0, 0);
+  return d < getToday();
 }
 
 function addDays(dateStr, days) {
@@ -157,9 +205,25 @@ function saveCache(list) {
   sessionStorage.setItem(CACHE_KEY, JSON.stringify(list));
 }
 
+function loadTicketsCache() {
+  try {
+    const raw = sessionStorage.getItem(TICKETS_CACHE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveTicketsCache(list) {
+  tickets = list;
+  sessionStorage.setItem(TICKETS_CACHE_KEY, JSON.stringify(list));
+}
+
 function clearCache() {
   codes = [];
+  tickets = [];
   sessionStorage.removeItem(CACHE_KEY);
+  sessionStorage.removeItem(TICKETS_CACHE_KEY);
 }
 
 function loadSort() {
@@ -179,8 +243,9 @@ function saveSort() {
 }
 
 function activateTab(tabId) {
+  const navTabId = tabId === "add" ? "list" : tabId;
   tabButtons.forEach((btn) => {
-    const active = btn.dataset.tab === tabId;
+    const active = btn.dataset.tab === navTabId;
     btn.classList.toggle("tabs__btn--active", active);
     btn.setAttribute("aria-selected", String(active));
   });
@@ -270,11 +335,93 @@ function createMetaRow(iconSvg, text, className) {
 }
 
 const ICONS = {
-  seat:
-    "M5.35,5.64C4.45,5 4.23,3.76 4.86,2.85C5.5,1.95 6.74,1.73 7.65,2.36C8.55,3 8.77,4.24 8.14,5.15C7.5,6.05 6.26,6.27 5.35,5.64M16,19H8.93C7.45,19 6.19,17.92 5.97,16.46L4,7H2L4,16.76C4.37,19.2 6.47,21 8.94,21H16M16.23,15H11.35L10.32,10.9C11.9,11.79 13.6,12.44 15.47,12.12V10C13.84,10.3 12.03,9.72 10.78,8.74L9.14,7.47C8.91,7.29 8.65,7.17 8.38,7.09C8.06,7 7.72,6.97 7.39,7.03H7.37C6.14,7.25 5.32,8.42 5.53,9.64L6.88,15.56C7.16,17 8.39,18 9.83,18H16.68L20.5,21L22,19.5",
-  play: "M8 5v14l11-7L8 5z",
-  pause: "M6 19h4V5H6v14zm8-14v14h4V5h-4z",
+  seat: "M4 18v3h3v-3h10v3h3v-6H4zm15-8h3v3h-3zM2 10h3v3H2zm15 3H7V5c0-1.1.9-2 2-2h6c1.1 0 2 .9 2 2z",
+  clock:
+    "M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm0 18c-4.4 0-8-3.6-8-8s3.6-8 8-8 8 3.6 8 8-3.6 8-8 8zm.5-13H11v6l5.2 3.2.8-1.3-4.5-2.7V7z",
 };
+
+function openTicketOverlay(ticket) {
+  ticketOverlayTitle.textContent = ticket.title || "Entrada";
+  ticketOverlayQr.src = ticket.qrDataUrl || "";
+  ticketOverlayBarcode.src = ticket.barcodeDataUrl || "";
+  ticketOverlay.hidden = false;
+  ticketOverlayClose.focus();
+}
+
+function closeTicketOverlay() {
+  if (ticketOverlay.hidden) return;
+  ticketOverlay.hidden = true;
+  ticketOverlayQr.removeAttribute("src");
+  ticketOverlayBarcode.removeAttribute("src");
+}
+
+function createTicketCard(ticket) {
+  const card = document.createElement("article");
+  card.className = "card";
+
+  const header = document.createElement("div");
+  header.className = "card__header";
+  const title = document.createElement("h3");
+  title.className = "card__code";
+  title.textContent = ticket.title || ticket.accessCode || "Entrada";
+  header.appendChild(title);
+
+  const meta = document.createElement("div");
+  meta.className = "card__meta";
+  if (ticket.showtime) {
+    meta.appendChild(createMetaRow(createMetaIcon(ICONS.clock), ticket.showtime, "card__date"));
+  }
+  if (ticket.seatsText) {
+    meta.appendChild(createMetaRow(createMetaIcon(ICONS.seat), ticket.seatsText, "card__seats"));
+  }
+
+  const actions = document.createElement("div");
+  actions.className = "card__actions";
+
+  const viewBtn = document.createElement("button");
+  viewBtn.type = "button";
+  viewBtn.className = "btn btn--secondary btn--icon";
+  viewBtn.title = "Ver QR y barras";
+  viewBtn.textContent = "Ver";
+  viewBtn.addEventListener("click", () => openTicketOverlay(ticket));
+
+  const deleteBtn = document.createElement("button");
+  deleteBtn.type = "button";
+  deleteBtn.className = "btn btn--danger btn--icon";
+  deleteBtn.title = "Eliminar entrada";
+  deleteBtn.textContent = "Eliminar";
+  deleteBtn.addEventListener("click", async () => {
+    deleteBtn.disabled = true;
+    deleteBtn.textContent = "…";
+    try {
+      await deleteTicketRemote(user.uid, ticket.accessCode);
+      saveTicketsCache(tickets.filter((t) => t.accessCode !== ticket.accessCode));
+      renderTickets();
+    } catch (err) {
+      console.error(err);
+      deleteBtn.disabled = false;
+      deleteBtn.textContent = "Eliminar";
+      showTicketsMessage("No se pudo borrar en la nube.", "error");
+    }
+  });
+
+  actions.append(viewBtn, deleteBtn);
+  card.append(header, meta, actions);
+  return card;
+}
+
+function renderTickets() {
+  ticketList.innerHTML = "";
+  if (tickets.length === 0) {
+    emptyTickets.hidden = false;
+    return;
+  }
+  emptyTickets.hidden = true;
+  const sorted = [...tickets].sort((a, b) =>
+    String(b.savedAt || "").localeCompare(String(a.savedAt || "")),
+  );
+  sorted.forEach((ticket) => ticketList.appendChild(createTicketCard(ticket)));
+}
 
 function createCard(item) {
   const daysRemaining = getDaysRemaining(item.expiresAt);
@@ -306,7 +453,7 @@ function createCard(item) {
     statusText = `${daysRemaining} día${daysRemaining === 1 ? "" : "s"} restante${daysRemaining === 1 ? "" : "s"}`;
   }
   const statusEl = createMetaRow(
-    createMetaIcon(waiting ? ICONS.pause : ICONS.play),
+    createMetaIcon(ICONS.clock),
     statusText,
     statusClasses,
   );
@@ -404,20 +551,128 @@ function renderList() {
 }
 
 function clearForm() {
+  validationRequestId += 1;
+  clearTimeout(validationDebounceTimer);
   codeInput.value = "";
   seatsInput.value = "";
   dateInput.value = formatDateForInput(new Date());
-  updateSubmit();
+  validationState = { status: "idle", code: "" };
+  updateValidationUI();
 }
 
-function updateSubmit() {
+function isSavableStatus(status) {
+  return status === "valid" || status === "not_yet_valid";
+}
+
+function isFormComplete() {
   const seats = Number.parseInt(seatsInput.value, 10);
-  const ok =
+  return (
     codeInput.value.trim().length > 0 &&
     Number.isInteger(seats) &&
     seats >= 1 &&
-    Boolean(dateInput.value);
-  submitBtn.disabled = !ok;
+    Boolean(dateInput.value)
+  );
+}
+
+function setSubmitBusy(busy) {
+  submitBusy = busy;
+  submitBtn.classList.toggle("btn--busy", busy);
+  if (busy) submitBtn.disabled = true;
+  else updateValidationUI();
+}
+
+function updateValidationUI() {
+  const code = codeInput.value.trim();
+  codeInput.classList.remove("form__input--valid", "form__input--invalid", "form__input--pending");
+
+  if (!code) {
+    codeValidation.hidden = true;
+    submitBtn.disabled = true;
+    return;
+  }
+
+  const labels = {
+    loading: "Comprobando código…",
+    valid: "Código válido",
+    invalid: "El código no es válido",
+    expired: "El código ha caducado",
+    not_yet_valid: "Pendiente: se podrá usar 24h después de su creación",
+    seats_redeemed: "Todas las butacas ya han sido canjeadas",
+    duplicate: "Este código ya está guardado",
+    error: "No se pudo comprobar el código. Revisa tu conexión.",
+    idle: "",
+  };
+
+  if (validationState.status === "idle") {
+    codeValidation.hidden = true;
+    submitBtn.disabled = true;
+    return;
+  }
+
+  codeValidation.hidden = false;
+  codeValidation.className = `code-validation code-validation--${validationState.status}`;
+  codeValidation.textContent = labels[validationState.status] || "";
+
+  if (validationState.status === "valid") {
+    codeInput.classList.add("form__input--valid");
+  } else if (validationState.status === "not_yet_valid") {
+    codeInput.classList.add("form__input--pending");
+  } else if (
+    ["invalid", "expired", "seats_redeemed", "duplicate", "error"].includes(validationState.status)
+  ) {
+    codeInput.classList.add("form__input--invalid");
+  }
+
+  submitBtn.disabled =
+    submitBusy ||
+    !(
+      isFormComplete() &&
+      isSavableStatus(validationState.status) &&
+      validationState.code === code
+    );
+}
+
+async function validateCodeInput(code) {
+  const requestId = ++validationRequestId;
+  validationState = { status: "loading", code };
+  updateValidationUI();
+
+  try {
+    if (codes.some((c) => c.code === code)) {
+      if (requestId !== validationRequestId) return null;
+      validationState = { status: "duplicate", code };
+      updateValidationUI();
+      return { status: "duplicate" };
+    }
+    const result = await validateCodeRemote(code);
+    if (requestId !== validationRequestId) return null;
+    validationState = { status: result.status, code };
+    updateValidationUI();
+    return result;
+  } catch (err) {
+    console.error(err);
+    if (requestId !== validationRequestId) return null;
+    validationState = { status: "error", code };
+    updateValidationUI();
+    return { status: "error" };
+  }
+}
+
+function scheduleValidation() {
+  clearTimeout(validationDebounceTimer);
+  const code = codeInput.value.trim();
+  if (!code) {
+    validationState = { status: "idle", code: "" };
+    updateValidationUI();
+    return;
+  }
+  validationDebounceTimer = setTimeout(() => {
+    validateCodeInput(code);
+  }, VALIDATION_DEBOUNCE_MS);
+}
+
+function updateSubmit() {
+  updateValidationUI();
 }
 
 async function syncFromCloud() {
@@ -426,6 +681,11 @@ async function syncFromCloud() {
   const cleaned = purgeExpired(merged);
   saveCache(cleaned);
   renderList();
+
+  const localTickets = loadTicketsCache();
+  const mergedTickets = await syncTickets(user.uid, localTickets);
+  saveTicketsCache(mergedTickets);
+  renderTickets();
 }
 
 async function enterApp(authUser) {
@@ -443,7 +703,9 @@ async function enterApp(authUser) {
   } catch (err) {
     console.error(err);
     codes = purgeExpired(loadCache());
+    tickets = loadTicketsCache();
     renderList();
+    renderTickets();
     showListMessage("Usando cache local; no se pudo sync.", "error");
   }
 }
@@ -452,6 +714,8 @@ function leaveApp() {
   user = null;
   clearCache();
   codeList.innerHTML = "";
+  ticketList.innerHTML = "";
+  closeTicketOverlay();
   clearForm();
   showView("login");
   hideLoginMessage();
@@ -484,6 +748,13 @@ tabButtons.forEach((btn) => {
   btn.addEventListener("click", () => activateTab(btn.dataset.tab));
 });
 
+addCodeBtn.addEventListener("click", () => {
+  activateTab("add");
+  codeInput.focus();
+});
+
+addBackBtn.addEventListener("click", () => activateTab("list"));
+
 sortButtons.forEach((btn) => {
   btn.addEventListener("click", () => {
     const field = btn.dataset.sort;
@@ -499,7 +770,10 @@ sortButtons.forEach((btn) => {
   });
 });
 
-codeInput.addEventListener("input", updateSubmit);
+codeInput.addEventListener("input", () => {
+  scheduleValidation();
+  updateSubmit();
+});
 seatsInput.addEventListener("input", () => {
   seatsInput.value = seatsInput.value.replace(/\D/g, "");
   updateSubmit();
@@ -528,19 +802,29 @@ form.addEventListener("submit", async (e) => {
     return;
   }
 
+  if (!isSavableStatus(validationState.status) || validationState.code !== code) {
+    setSubmitBusy(true);
+    const result = await validateCodeInput(code);
+    if (!result || !isSavableStatus(result.status)) {
+      showFormMessage("El código no es válido o ha caducado.", "error");
+      setSubmitBusy(false);
+      return;
+    }
+  }
+
+  const pendingActivation = validationState.status === "not_yet_valid";
   const entry = {
     code,
     createdAt,
     expiresAt: addDays(createdAt, VALIDITY_DAYS),
     seats,
   };
+  if (pendingActivation) entry.pendingActivation = true;
 
+  setSubmitBusy(true);
   const next = [...codes, entry];
   saveCache(next);
   renderList();
-  clearForm();
-  activateTab("list");
-  showFormMessage("Código guardado.");
 
   try {
     await upsertCode(user.uid, entry);
@@ -548,6 +832,34 @@ form.addEventListener("submit", async (e) => {
     console.error(err);
     showListMessage("Guardado en cache; falló la nube.", "error");
   }
+
+  try {
+    const ticket = await fetchEntradaRemote(code);
+    if (ticket?.accessCode) {
+      if (isShowtimePast(ticket.showtime)) {
+        showListMessage("Código guardado; la sesión ya pasó, no se añadió la entrada.", "error");
+      } else {
+        const exists = tickets.some((t) => t.accessCode === ticket.accessCode);
+        await upsertTicket(user.uid, ticket);
+        if (exists) {
+          saveTicketsCache(
+            tickets.map((t) => (t.accessCode === ticket.accessCode ? ticket : t)),
+          );
+        } else {
+          saveTicketsCache([...tickets, ticket]);
+        }
+        renderTickets();
+      }
+    }
+  } catch (err) {
+    console.error(err);
+    showListMessage("Código guardado; no se pudo obtener la entrada.", "error");
+  }
+
+  setSubmitBusy(false);
+  clearForm();
+  activateTab("list");
+  showFormMessage("Código guardado.");
 });
 
 exportBtn.addEventListener("click", () => {
@@ -632,6 +944,19 @@ barcodeOverlay.addEventListener("click", (e) => {
     barcodeOverlay.hidden = true;
     barcodeOverlaySvg.innerHTML = "";
   }
+});
+
+ticketOverlayClose.addEventListener("click", closeTicketOverlay);
+ticketOverlay.addEventListener("click", (e) => {
+  if (e.target === ticketOverlay) closeTicketOverlay();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  if (!barcodeOverlay.hidden) {
+    barcodeOverlay.hidden = true;
+    barcodeOverlaySvg.innerHTML = "";
+  }
+  closeTicketOverlay();
 });
 
 let authReady = false;

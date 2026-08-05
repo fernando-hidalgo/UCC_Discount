@@ -1,6 +1,6 @@
-# UCC Mis Descuentos
+# UCC Manager
 
-Agenda de códigos de descuento para Unión Cine Ciudad (Metromar). Requiere Google; los cupones viven en Firestore y se comparten entre la extensión Firefox y la web.
+Agenda de códigos de descuento y entradas para Unión Cine Ciudad (Metromar). Requiere Google; los datos viven en Firestore y se comparten entre la extensión Firefox y la web.
 
 ## Extensión Firefox
 
@@ -8,20 +8,29 @@ Agenda de códigos de descuento para Unión Cine Ciudad (Metromar). Requiere Goo
 
 1. **Entrar con Google**
 2. Gestiona códigos (con validación remota contra compraentradas)
-3. **Salir** borra la cache local (siguen en la nube)
+3. En `compraentradas.com/Entrada/…`, pulsa **Guardar entrada** (QR + barras → pestaña Entradas)
+4. **Salir** borra la cache local (siguen en la nube)
+
+Firestore: en la consola, permite `users/{uid}/tickets/{ticketId}` igual que `codes`.
 
 ## Web (iOS / cualquier móvil)
 
 URL: [https://ucc-discount.web.app](https://ucc-discount.web.app)
 
-Misma cuenta y mismos códigos que la extensión. En la web **no** hay validación remota (CORS; requiere Blaze + Cloud Function en el futuro).
+Misma cuenta: códigos y entradas. Al **añadir un código** la web:
 
-### Deploy Hosting (Spark, sin Blaze)
+1. Lo valida vía Cloud Function (`validateCode` → compraentradas)
+2. Guarda el código
+3. Descarga la entrada asociada (`fetchEntrada` → `/Entrada/{ref}`) y la guarda aparte (borrar código ≠ borrar entrada)
 
-1. Firebase Console → Hosting activado; Auth → Authorized domains con `ucc-discount.web.app`.
-2. Google Cloud → OAuth **Web client (auto created by Google Service)**:
+Requiere plan **Blaze** (Functions con red saliente).
+
+### Deploy (Blaze)
+
+1. Firebase Console → proyecto en **Blaze**; Auth → Authorized domains con `ucc-discount.web.app`.
+2. Google Cloud → OAuth **Web client**:
    - Orígenes JS: `https://ucc-discount.web.app` y `https://ucc-discount.firebaseapp.com`
-   - URIs de redirección: añade **`https://ucc-discount.web.app/__/auth/handler`** (necesario en Safari/iOS)
+   - URIs de redirección: **`https://ucc-discount.web.app/__/auth/handler`**
 3. En el PC:
 
 ```bash
@@ -29,13 +38,14 @@ npm i -g firebase-tools
 firebase login
 cd c:\Users\Misco\Documents\Github\ucc-discount
 firebase use ucc-discount
-firebase deploy --only hosting
+cd functions && npm i && cd ..
+firebase deploy --only functions,hosting
 ```
 
-## Desarrollo extensión
+## Desarrollo
 
 ```bash
 node selfcheck.js
 ```
 
-Carga temporal: `about:debugging` → Cargar complemento temporal → `manifest.json`.
+Extensión temporal: `about:debugging` → Cargar complemento temporal → `manifest.json`.

@@ -1,0 +1,81 @@
+.ucc-ticket-frame {
+  margin: 1.25rem auto;
+  max-width: 420px;
+  padding: 1.25rem 1rem 1rem;
+  border: 2px solid #003092;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #f7f9fc 0%, #fff 40%);
+  box-shadow: 0 4px 14px rgba(0, 48, 146, 0.12);
+}
+
+.ucc-ticket-frame > p {
+  margin-top: 0.75rem !important;
+  margin-bottom: 0.75rem !important;
+}
+
+.ucc-ticket-frame > p:first-of-type {
+  margin-top: 0 !important;
+}
+
+.ucc-save-ticket {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 1rem 0 0;
+  padding-top: 0.85rem;
+  border-top: 1px solid rgba(0, 48, 146, 0.15);
+}
+
+.ucc-save-ticket__btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  border: none;
+  border-radius: 8px;
+  padding: 0.55rem 1.15rem 0.55rem 0.65rem;
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  color: #fff;
+  background: linear-gradient(90deg, #003092 0%, #d91f45 100%);
+  box-shadow: 0 2px 8px rgba(0, 48, 146, 0.28);
+}
+
+.ucc-save-ticket__btn:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.ucc-save-ticket__btn:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.ucc-save-ticket__logo {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.35);
+}
+
+.ucc-save-ticket__status {
+  margin: 0;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.ucc-save-ticket__status--ok {
+  color: #0a7a32;
+}
+
+.ucc-save-ticket__status--error {
+  color: #d91f45;
+}
+
+.ucc-save-ticket__status--info {
+  color: #334155;
+}

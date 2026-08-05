@@ -175,11 +175,11 @@ body:has(#view-app:not([hidden])) {
 
 .tabs__btn {
   flex: 1;
-  padding: 11px 8px;
+  padding: 11px 4px;
   border: none;
   background: transparent;
   font-family: var(--font);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--color-text-muted);
   cursor: pointer;
@@ -208,6 +208,27 @@ body:has(#view-app:not([hidden])) {
 
 .panel--active {
   display: block;
+}
+
+.back-btn {
+  -moz-appearance: none;
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 0 12px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-primary);
+  cursor: pointer;
+}
+
+.back-btn:hover {
+  color: var(--color-accent);
 }
 
 /* ─── Code list ──────────────────────────────────────────────────────────── */
@@ -314,6 +335,15 @@ body:has(#view-app:not([hidden])) {
 .toolbar-btn:hover {
   color: var(--color-primary);
   background: var(--color-primary-soft);
+}
+
+.toolbar-btn--text {
+  width: auto;
+  padding: 0 8px;
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .toolbar-divider {
@@ -551,6 +581,48 @@ body:has(#view-app:not([hidden])) {
   display: block;
   width: 100%;
   height: auto;
+}
+
+.ticket-overlay__panel {
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.ticket-overlay__meta {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  line-height: 1.4;
+}
+
+.ticket-overlay__codes {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.ticket-overlay__label {
+  margin: 8px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text);
+  text-align: center;
+}
+
+.ticket-overlay__qr,
+.ticket-overlay__barcode {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  background: #fff;
+}
+
+.ticket-overlay__access {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  text-align: center;
 }
 
 /* ─── Form ───────────────────────────────────────────────────────────────── */

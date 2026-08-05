@@ -198,3 +198,87 @@ async function syncCodesWithCloud(getLocalCodes, saveLocalCodes) {
   await saveLocalCodes(merged);
   return { synced: true, count: merged.length };
 }
+
+function ticketDocId(accessCode) {
+  return codeDocId(accessCode);
+}
+
+function ticketToFields(ticket) {
+  return {
+    accessCode: { stringValue: ticket.accessCode },
+    referencia: { stringValue: ticket.referencia || "" },
+    title: { stringValue: ticket.title || "" },
+    showtime: { stringValue: ticket.showtime || "" },
+    cinema: { stringValue: ticket.cinema || "" },
+    seatsText: { stringValue: ticket.seatsText || "" },
+    qrDataUrl: { stringValue: ticket.qrDataUrl || "" },
+    barcodeDataUrl: { stringValue: ticket.barcodeDataUrl || "" },
+    savedAt: { stringValue: ticket.savedAt || "" },
+  };
+}
+
+function fieldsToTicket(fields) {
+  if (!fields?.accessCode?.stringValue) return null;
+  return {
+    accessCode: fields.accessCode.stringValue,
+    referencia: fields.referencia?.stringValue || "",
+    title: fields.title?.stringValue || "",
+    showtime: fields.showtime?.stringValue || "",
+    cinema: fields.cinema?.stringValue || "",
+    seatsText: fields.seatsText?.stringValue || "",
+    qrDataUrl: fields.qrDataUrl?.stringValue || "",
+    barcodeDataUrl: fields.barcodeDataUrl?.stringValue || "",
+    savedAt: fields.savedAt?.stringValue || "",
+  };
+}
+
+async function pullRemoteTickets() {
+  const session = await getValidSession();
+  if (!session) return null;
+
+  const data = await firestoreFetch(`/users/${session.uid}/tickets`, { session });
+  if (!data?.documents) return [];
+
+  return data.documents
+    .map((doc) => fieldsToTicket(doc.fields))
+    .filter(Boolean);
+}
+
+async function upsertRemoteTicket(ticket) {
+  const session = await getValidSession();
+  if (!session) return;
+
+  const docId = ticketDocId(ticket.accessCode);
+  await firestoreFetch(`/users/${session.uid}/tickets/${docId}`, {
+    method: "PATCH",
+    session,
+    body: { fields: ticketToFields(ticket) },
+  });
+}
+
+async function deleteRemoteTicket(accessCode) {
+  const session = await getValidSession();
+  if (!session) return;
+
+  const docId = ticketDocId(accessCode);
+  await firestoreFetch(`/users/${session.uid}/tickets/${docId}`, {
+    method: "DELETE",
+    session,
+  });
+}
+
+function mergeRemoteTickets(local, remote) {
+  const localMap = new Map(local.map((i) => [i.accessCode.trim(), i]));
+  return remote.map((r) => localMap.get(r.accessCode.trim()) || r);
+}
+
+async function syncTicketsWithCloud(getLocalTickets, saveLocalTickets) {
+  const session = await getValidSession();
+  if (!session) return { synced: false };
+
+  const local = await getLocalTickets();
+  const remote = (await pullRemoteTickets()) || [];
+  const merged = mergeRemoteTickets(local, remote);
+  await saveLocalTickets(merged);
+  return { synced: true, count: merged.length };
+}
