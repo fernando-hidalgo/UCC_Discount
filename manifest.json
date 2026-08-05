@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "UCC Manager",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "description": "Agenda de códigos de descuento y entradas para Unión Cine Ciudad (Metromar)",
   "browser_specific_settings": {
     "gecko": {
@@ -53,7 +53,8 @@
     "16": "icons/icon-16.png",
     "32": "icons/icon-32.png",
     "48": "icons/icon-48.png",
-    "64": "icons/icon-64.png"
+    "64": "icons/icon-64.png",
+    "128": "icons/icon-128.png"
   },
   "action": {
     "default_popup": "popup.html",
@@ -62,7 +63,8 @@
       "16": "icons/icon-16.png",
       "32": "icons/icon-32.png",
       "48": "icons/icon-48.png",
-      "64": "icons/icon-64.png"
+      "64": "icons/icon-64.png",
+      "128": "icons/icon-128.png"
     }
   }
 }

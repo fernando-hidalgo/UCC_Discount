@@ -5,3 +5,7 @@ ucc-discount-*.zip
 ucc_manager-*.zip
 dist/
 web-ext-artifacts/
+node_modules/
+_gen_icons.py
+_gen_icons.js
+_fix_logo.py

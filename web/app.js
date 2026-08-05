@@ -101,12 +101,42 @@ function closeBarcodeOverlay() {
   barcodeOverlaySvg.replaceChildren();
 }
 
+let loginBgTimer = null;
+
+function stopLoginBgWander() {
+  if (loginBgTimer != null) {
+    clearTimeout(loginBgTimer);
+    loginBgTimer = null;
+  }
+}
+
+function prefersReducedMotion() {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function scheduleLoginBgWander() {
+  stopLoginBgWander();
+  if (!viewLogin || viewLogin.hidden || prefersReducedMotion()) return;
+
+  const x = 5 + Math.random() * 90;
+  const y = 5 + Math.random() * 90;
+  const dur = 3.5 + Math.random() * 3;
+  viewLogin.style.transition = `background-position ${dur.toFixed(1)}s ease-in-out`;
+  viewLogin.style.backgroundPosition = `${x.toFixed(1)}% ${y.toFixed(1)}%`;
+  loginBgTimer = setTimeout(scheduleLoginBgWander, dur * 1000);
+}
+
 function showView(name) {
   const isApp = name === "app";
   viewLogin.hidden = isApp;
   viewApp.hidden = !isApp;
   document.body.classList.toggle("is-login", !isApp);
   document.documentElement.classList.toggle("is-login", !isApp);
+  if (isApp) {
+    stopLoginBgWander();
+  } else {
+    scheduleLoginBgWander();
+  }
 }
 
 function displayName(email) {
@@ -1064,6 +1094,7 @@ document.addEventListener("keydown", (e) => {
 let authReady = false;
 
 showLoginMessage("Comprobando sesión…");
+scheduleLoginBgWander();
 
 const footerYear = document.getElementById("footer-year");
 if (footerYear) footerYear.textContent = String(new Date().getFullYear());
