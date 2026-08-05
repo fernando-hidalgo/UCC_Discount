@@ -17,7 +17,6 @@ const codeInput = document.getElementById("code-input");
 const codeValidation = document.getElementById("code-validation");
 const submitBtn = document.getElementById("submit-btn");
 const clearFormBtn = document.getElementById("clear-form-btn");
-const addBackBtn = document.getElementById("add-back-btn");
 const seatsInput = document.getElementById("seats-input");
 const dateTrigger = document.getElementById("date-trigger");
 const dateTriggerText = document.getElementById("date-trigger-text");
@@ -760,9 +759,8 @@ function sortCodes(entries) {
 
 function activateTab(tabId, persistDraft = true) {
   activeTabId = tabId;
-  const navTabId = tabId === "add" ? "list" : tabId;
   tabButtons.forEach((btn) => {
-    const active = btn.dataset.tab === navTabId;
+    const active = tabId !== "add" && btn.dataset.tab === tabId;
     btn.classList.toggle("tabs__btn--active", active);
     btn.setAttribute("aria-selected", String(active));
   });
@@ -771,6 +769,7 @@ function activateTab(tabId, persistDraft = true) {
     panel.classList.toggle("panel--active", show);
     panel.hidden = !show;
   });
+  addCodeBtn.hidden = tabId === "add";
   if (persistDraft) saveFormDraft();
 }
 
@@ -1252,11 +1251,6 @@ addCodeBtn.addEventListener("click", () => {
   codeInput.focus();
 });
 
-addBackBtn.addEventListener("click", () => {
-  toggleCalendar(false);
-  activateTab("list");
-});
-
 importBtn.addEventListener("click", () => {
   importInput.click();
 });
@@ -1367,12 +1361,31 @@ form.addEventListener("submit", async (e) => {
   }
   await renderList();
 
+  let formMsg = "Código guardado correctamente.";
+  let formMsgType = "success";
+  try {
+    const ticketRes = await browser.runtime.sendMessage({
+      type: "fetch-and-save-entrada",
+      referencia: code,
+    });
+    await renderTickets();
+    if (ticketRes?.skipped === "past_showtime") {
+      formMsg = "Código guardado; la sesión ya pasó, no se añadió la entrada.";
+      formMsgType = "error";
+    } else if (ticketRes?.ok && !ticketRes.skipped) {
+      formMsg = "Código y entrada guardados.";
+    }
+    // no_entrada / !ok → keep "Código guardado correctamente."
+  } catch {
+    /* code already saved */
+  }
+
   codeInput.value = "";
   seatsInput.value = "";
   resetValidation(true);
   initDate();
   await clearFormDraft();
-  showFormMessage("Código guardado correctamente.");
+  showFormMessage(formMsg, formMsgType);
   activateTab("list");
 });
 

@@ -1,9 +1,12 @@
 const VALIDATION_URL = "https://www.compraentradas.com/Sesion/VuelvePor5";
+const ENTRADA_BASE = "https://www.compraentradas.com/Entrada";
 const MSG_EXPIRED = "han pasado más de 60 días";
 const MSG_NOT_YET = "24 horas después de la compra";
 const MSG_SEATS_REDEEMED = "ya se han canjeado todas las butacas";
 const MSG_INVALID = "La referencia no es válida";
 const TICKETS_KEY = "tickets";
+const CODES_KEY = "codes";
+const VALIDITY_DAYS = 59;
 /* AUTH_KEY + getRedirectUri come from sync.js (loaded before this script) */
 
 async function fetchValidationBody(code) {
@@ -53,6 +56,128 @@ function parseValidationResult(body) {
 async function validateCode(code) {
   const body = await fetchValidationBody(code);
   return parseValidationResult(body);
+}
+
+function decodeHtml(s) {
+  return String(s || "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+}
+
+/** Extract ticket fields from compraentradas Entrada HTML. */
+function parseEntradaHtml(html, referencia) {
+  const text = decodeHtml(html.replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "\n"));
+  const lines = text
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  const accessFromText = (text.match(/C[oó]digo de barras:\s*(\d+)/i) || [])[1] || "";
+  const qrSrc = (html.match(/src="(\/qrcode\/\?Codigo=\d+)"/i) || [])[1] || "";
+  const barcodeSrc = (html.match(/src="(\/codbarras\/[^"]*Codigo=\d+[^"]*)"/i) || [])[1] || "";
+  const codigoFromSrc = (qrSrc.match(/Codigo=(\d+)/i) || barcodeSrc.match(/Codigo=(\d+)/i) || [])[1] || "";
+  const accessCode = String(accessFromText || codigoFromSrc).trim();
+
+  const posterAlt = (html.match(/src="\/Carteles\/[^"]+"[^>]*alt="([^"]*)"/i) ||
+    html.match(/alt="([^"]*)"[^>]*src="\/Carteles\//i) ||
+    [])[1];
+  let title = (posterAlt || "").trim();
+  if (!title || /promoci/i.test(title)) {
+    title =
+      lines.find(
+        (l) =>
+          !/\d{2}\/\d{2}\/\d{4}/.test(l) &&
+          !/butaca|entrada|total|cif|€|promoci|referencia|metromar|mendivil|mairena|cc\s|gracias|aviso|codigo/i.test(
+            l,
+          ),
+      ) || title;
+  }
+
+  const showtime = lines.find((l) => /\d{2}\/\d{2}\/\d{4}/.test(l)) || "";
+  const cinema = lines.find((l) => /cinemas/i.test(l)) || "";
+  const seatsText = lines
+    .filter((l) => /Butaca Fila/i.test(l))
+    .map((l) => {
+      const m = l.match(/Fila:\s*(\d+),\s*Butaca:\s*(\d+)/i);
+      return m ? `Fila ${m[1]} Butaca ${m[2]}` : l;
+    })
+    .join("; ");
+
+  const refFromPage = (text.match(/Referencia\s+(\d+)/i) || [])[1] || String(referencia || "");
+
+  return {
+    accessCode,
+    referencia: refFromPage,
+    title: title || "",
+    showtime,
+    cinema,
+    seatsText,
+    qrPath: qrSrc,
+    barcodePath: barcodeSrc,
+  };
+}
+
+async function blobToDataUrl(res) {
+  const buf = new Uint8Array(await res.arrayBuffer());
+  let binary = "";
+  for (let i = 0; i < buf.length; i++) binary += String.fromCharCode(buf[i]);
+  const ctype = res.headers.get("content-type") || "image/png";
+  return `data:${ctype};base64,${btoa(binary)}`;
+}
+
+function isShowtimePast(showtime) {
+  const m = String(showtime || "").match(/(\d{2})\/(\d{2})\/(\d{4})/);
+  if (!m) return false;
+  const d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+  d.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return d < today;
+}
+
+async function fetchAndSaveEntrada(referencia) {
+  const ref = String(referencia || "").trim();
+  if (!/^\d+$/.test(ref)) return { ok: false, error: "invalid_referencia" };
+
+  const pageRes = await fetch(`${ENTRADA_BASE}/${ref}`, {
+    headers: { Accept: "text/html" },
+  });
+  if (!pageRes.ok) return { ok: true, skipped: "no_entrada" };
+
+  const parsed = parseEntradaHtml(await pageRes.text(), ref);
+  if (!parsed.accessCode || !parsed.qrPath || !parsed.barcodePath) {
+    return { ok: true, skipped: "no_entrada" };
+  }
+  if (isShowtimePast(parsed.showtime)) {
+    return { ok: true, skipped: "past_showtime" };
+  }
+
+  const [qrRes, barcodeRes] = await Promise.all([
+    fetch(`https://www.compraentradas.com${parsed.qrPath}`),
+    fetch(`https://www.compraentradas.com${parsed.barcodePath}`),
+  ]);
+  if (!qrRes.ok || !barcodeRes.ok) return { ok: true, skipped: "no_entrada" };
+
+  const [qrDataUrl, barcodeDataUrl] = await Promise.all([
+    blobToDataUrl(qrRes),
+    blobToDataUrl(barcodeRes),
+  ]);
+
+  return saveTicketFromPage({
+    accessCode: parsed.accessCode,
+    referencia: parsed.referencia || ref,
+    title: parsed.title,
+    showtime: parsed.showtime,
+    cinema: parsed.cinema,
+    seatsText: parsed.seatsText,
+    qrDataUrl,
+    barcodeDataUrl,
+    savedAt: new Date().toISOString(),
+  });
 }
 
 function parseHashParams(redirectedTo) {
@@ -157,6 +282,83 @@ async function saveTicketFromPage(ticket) {
   return { ok: true, created };
 }
 
+function addDaysYmd(dateStr, days) {
+  const [y, m, d] = String(dateStr).split("-").map(Number);
+  const date = new Date(y, m - 1, d);
+  date.setDate(date.getDate() + days);
+  const yy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
+}
+
+function todayYmd() {
+  const now = new Date();
+  const yy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
+}
+
+async function saveCodeFromPage({ code, createdAt, seats }) {
+  const session = await getValidSession();
+  if (!session) return { ok: false, error: "not_signed_in" };
+
+  const normalized = String(code || "").trim();
+  const seatsN = Number.parseInt(seats, 10);
+  let created = String(createdAt || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(created)) created = todayYmd();
+  if (!normalized || !Number.isInteger(seatsN) || seatsN < 1) {
+    return { ok: false, error: "invalid_code" };
+  }
+
+  const result = await browser.storage.local.get(CODES_KEY);
+  const codes = result[CODES_KEY] || [];
+  if (codes.some((item) => String(item.code || "").trim() === normalized)) {
+    return { ok: true, created: false };
+  }
+
+  const entry = {
+    code: normalized,
+    createdAt: created,
+    expiresAt: addDaysYmd(created, VALIDITY_DAYS),
+    seats: seatsN,
+  };
+  codes.push(entry);
+  await browser.storage.local.set({ [CODES_KEY]: codes });
+
+  try {
+    await upsertRemoteCode(entry);
+  } catch {
+    /* local kept; retry on next sync */
+  }
+
+  return { ok: true, created: true };
+}
+
+async function saveTicketAndMaybeCode(ticket, code) {
+  const ticketRes = await saveTicketFromPage(ticket);
+  if (!ticketRes.ok) return ticketRes;
+
+  let codeCreated = false;
+  const ref = String(code?.code || "").trim();
+  if (ref) {
+    const codeRes = await saveCodeFromPage(code);
+    if (!codeRes.ok && codeRes.error !== "not_signed_in") {
+      /* ticket already saved; ignore code failure soft */
+    } else if (codeRes.ok) {
+      codeCreated = Boolean(codeRes.created);
+    }
+  }
+
+  return {
+    ok: true,
+    ticketCreated: Boolean(ticketRes.created),
+    codeCreated,
+    created: Boolean(ticketRes.created),
+  };
+}
+
 browser.runtime.onMessage.addListener((message) => {
   if (message?.type === "validate-code") {
     return validateCode(message.code);
@@ -170,7 +372,13 @@ browser.runtime.onMessage.addListener((message) => {
     });
   }
   if (message?.type === "save-ticket") {
-    return saveTicketFromPage(message.ticket).catch((err) => ({
+    return saveTicketAndMaybeCode(message.ticket, message.code).catch((err) => ({
+      ok: false,
+      error: err?.message || String(err),
+    }));
+  }
+  if (message?.type === "fetch-and-save-entrada") {
+    return fetchAndSaveEntrada(message.referencia).catch((err) => ({
       ok: false,
       error: err?.message || String(err),
     }));

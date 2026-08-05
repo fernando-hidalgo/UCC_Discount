@@ -12,6 +12,7 @@ import {
   validateCodeRemote,
   fetchEntradaRemote,
 } from "./firebase.js";
+import { readTicketImage } from "./ocr.js";
 
 const VALIDITY_DAYS = 59;
 const WARNING_DAYS = 5;
@@ -38,7 +39,16 @@ const dateInput = document.getElementById("date-input");
 const submitBtn = document.getElementById("submit-btn");
 const clearFormBtn = document.getElementById("clear-form-btn");
 const addCodeBtn = document.getElementById("add-code-btn");
-const addBackBtn = document.getElementById("add-back-btn");
+const ocrScan = document.getElementById("ocr-scan");
+const ocrScanBtn = document.getElementById("ocr-scan-btn");
+const ocrScanLabel = document.getElementById("ocr-scan-label");
+const ocrFileInput = document.getElementById("ocr-file-input");
+const ocrStatus = document.getElementById("ocr-status");
+const ocrStatusRow = document.getElementById("ocr-status-row");
+const ocrThumb = document.getElementById("ocr-thumb");
+const ocrResultText = document.getElementById("ocr-result-text");
+const ocrChangeBtn = document.getElementById("ocr-change-btn");
+let ocrObjectUrl = "";
 const codeList = document.getElementById("code-list");
 const emptyList = document.getElementById("empty-list");
 const ticketList = document.getElementById("ticket-list");
@@ -75,6 +85,8 @@ function showView(name) {
   const isApp = name === "app";
   viewLogin.hidden = isApp;
   viewApp.hidden = !isApp;
+  document.body.classList.toggle("is-login", !isApp);
+  document.documentElement.classList.toggle("is-login", !isApp);
 }
 
 function displayName(email) {
@@ -243,9 +255,8 @@ function saveSort() {
 }
 
 function activateTab(tabId) {
-  const navTabId = tabId === "add" ? "list" : tabId;
   tabButtons.forEach((btn) => {
-    const active = btn.dataset.tab === navTabId;
+    const active = tabId !== "add" && btn.dataset.tab === tabId;
     btn.classList.toggle("tabs__btn--active", active);
     btn.setAttribute("aria-selected", String(active));
   });
@@ -254,6 +265,7 @@ function activateTab(tabId) {
     panel.classList.toggle("panel--active", show);
     panel.hidden = !show;
   });
+  addCodeBtn.hidden = tabId === "add";
 }
 
 const SORT_ARROW_PATHS = {
@@ -558,6 +570,107 @@ function clearForm() {
   dateInput.value = formatDateForInput(new Date());
   validationState = { status: "idle", code: "" };
   updateValidationUI();
+  resetOcrUi();
+}
+
+function resetOcrUi() {
+  setOcrCardState("idle");
+  if (ocrScanLabel) ocrScanLabel.textContent = "Escanear";
+  ocrStatus.hidden = true;
+  ocrStatus.textContent = "";
+  ocrStatus.className = "ocr-scan__status";
+  if (ocrStatusRow) ocrStatusRow.hidden = true;
+  if (ocrObjectUrl) {
+    URL.revokeObjectURL(ocrObjectUrl);
+    ocrObjectUrl = "";
+  }
+  if (ocrThumb) ocrThumb.removeAttribute("src");
+  ocrFileInput.value = "";
+  ocrScanBtn.disabled = false;
+}
+
+function setOcrCardState(state) {
+  if (ocrScan) ocrScan.dataset.state = state;
+  if (ocrStatusRow) {
+    ocrStatusRow.hidden = state !== "done" && state !== "error";
+  }
+}
+
+function setOcrStatus(text, isError = false) {
+  ocrStatus.hidden = !text;
+  ocrStatus.textContent = text || "";
+  ocrStatus.className = `ocr-scan__status${isError ? " ocr-scan__status--error" : ""}`;
+}
+
+function ocrErrorMessage(err) {
+  const code = err?.code || "";
+  const msg = String(err?.message || "");
+  if (code === "functions/unauthenticated" || /unauthenticated/i.test(msg)) {
+    return "Inicia sesión de nuevo e inténtalo.";
+  }
+  if (code === "functions/permission-denied" || /OCR no habilitado|permiso/i.test(msg)) {
+    return "OCR no disponible. Rellena a mano o prueba más tarde.";
+  }
+  if (code === "functions/failed-precondition") {
+    return "No se pudo leer. Prueba otra foto.";
+  }
+  if (code === "functions/invalid-argument") {
+    return msg.replace(/^Firebase:\s*/i, "").replace(/\s*\(.*\)\s*$/, "") || "Imagen no válida.";
+  }
+  if (code === "functions/internal" || /internal/i.test(code)) {
+    return "No se pudo leer el ticket. Inténtalo de nuevo.";
+  }
+  if (/img_load|canvas|read_failed/i.test(msg)) {
+    return "No se pudo procesar la foto. Prueba otra.";
+  }
+  return "No se pudo leer la imagen. Inténtalo de nuevo.";
+}
+
+async function handleOcrFile(file) {
+  if (!file) return;
+  ocrScanBtn.disabled = true;
+  if (ocrScanLabel) ocrScanLabel.textContent = "Leyendo…";
+  if (ocrObjectUrl) URL.revokeObjectURL(ocrObjectUrl);
+  ocrObjectUrl = URL.createObjectURL(file);
+  if (ocrThumb) ocrThumb.src = ocrObjectUrl;
+  setOcrCardState("scanning");
+  setOcrStatus("");
+
+  try {
+    const result = await readTicketImage(file);
+    const missing = [];
+    if (result.referencia) codeInput.value = result.referencia;
+    else missing.push("referencia");
+    if (result.seats) seatsInput.value = result.seats;
+    else missing.push("butacas");
+    if (result.createdAt) dateInput.value = result.createdAt;
+    else missing.push("fecha");
+
+    scheduleValidation();
+    updateSubmit();
+
+    if (missing.length === 3) {
+      if (ocrResultText) ocrResultText.textContent = "Prueba otra foto o rellena a mano.";
+      setOcrCardState("error");
+      setOcrStatus("");
+    } else if (missing.length) {
+      if (ocrResultText) ocrResultText.textContent = `Falta: ${missing.join(", ")}`;
+      setOcrCardState("error");
+      setOcrStatus("");
+    } else {
+      if (ocrResultText) ocrResultText.textContent = "Código leído ✓";
+      setOcrCardState("done");
+      setOcrStatus("");
+    }
+  } catch (err) {
+    console.error(err);
+    if (ocrResultText) ocrResultText.textContent = ocrErrorMessage(err);
+    setOcrCardState("error");
+    setOcrStatus("");
+  } finally {
+    if (ocrScanLabel) ocrScanLabel.textContent = "Escanear";
+    ocrScanBtn.disabled = false;
+  }
 }
 
 function isSavableStatus(status) {
@@ -753,7 +866,12 @@ addCodeBtn.addEventListener("click", () => {
   codeInput.focus();
 });
 
-addBackBtn.addEventListener("click", () => activateTab("list"));
+ocrScanBtn.addEventListener("click", () => ocrFileInput.click());
+ocrChangeBtn?.addEventListener("click", () => ocrFileInput.click());
+ocrFileInput.addEventListener("change", () => {
+  const file = ocrFileInput.files?.[0];
+  if (file) handleOcrFile(file);
+});
 
 sortButtons.forEach((btn) => {
   btn.addEventListener("click", () => {
@@ -833,33 +951,36 @@ form.addEventListener("submit", async (e) => {
     showListMessage("Guardado en cache; falló la nube.", "error");
   }
 
+  let formMsg = "Código guardado.";
   try {
     const ticket = await fetchEntradaRemote(code);
-    if (ticket?.accessCode) {
-      if (isShowtimePast(ticket.showtime)) {
-        showListMessage("Código guardado; la sesión ya pasó, no se añadió la entrada.", "error");
+    if (ticket?.found === false || !ticket?.accessCode) {
+      /* code only */
+    } else if (isShowtimePast(ticket.showtime)) {
+      formMsg = "Código guardado; la sesión ya pasó, no se añadió la entrada.";
+      showListMessage(formMsg, "error");
+    } else {
+      const exists = tickets.some((t) => t.accessCode === ticket.accessCode);
+      await upsertTicket(user.uid, ticket);
+      if (exists) {
+        saveTicketsCache(
+          tickets.map((t) => (t.accessCode === ticket.accessCode ? ticket : t)),
+        );
       } else {
-        const exists = tickets.some((t) => t.accessCode === ticket.accessCode);
-        await upsertTicket(user.uid, ticket);
-        if (exists) {
-          saveTicketsCache(
-            tickets.map((t) => (t.accessCode === ticket.accessCode ? ticket : t)),
-          );
-        } else {
-          saveTicketsCache([...tickets, ticket]);
-        }
-        renderTickets();
+        saveTicketsCache([...tickets, ticket]);
       }
+      renderTickets();
+      formMsg = "Código y entrada guardados.";
     }
   } catch (err) {
     console.error(err);
-    showListMessage("Código guardado; no se pudo obtener la entrada.", "error");
+    /* code already saved */
   }
 
   setSubmitBusy(false);
   clearForm();
   activateTab("list");
-  showFormMessage("Código guardado.");
+  showFormMessage(formMsg);
 });
 
 exportBtn.addEventListener("click", () => {
@@ -962,6 +1083,9 @@ document.addEventListener("keydown", (e) => {
 let authReady = false;
 
 showLoginMessage("Comprobando sesión…");
+
+const footerYear = document.getElementById("footer-year");
+if (footerYear) footerYear.textContent = String(new Date().getFullYear());
 
 (async () => {
   try {

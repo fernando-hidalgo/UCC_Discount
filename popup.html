@@ -27,7 +27,18 @@
           <h1 class="header__title">UCC Manager</h1>
           <p class="header__auth-email" id="auth-email"></p>
         </div>
-        <button type="button" class="btn btn--auth" id="logout-btn">Salir</button>
+        <div class="header__actions">
+          <button
+            type="button"
+            class="btn btn--header-add"
+            id="add-code-btn"
+            title="Añadir código"
+            aria-label="Añadir código"
+          >
+            Añadir
+          </button>
+          <button type="button" class="btn btn--auth" id="logout-btn">Salir</button>
+        </div>
       </div>
     </header>
 
@@ -96,15 +107,6 @@
                 </svg>
               </button>
             </div>
-            <button
-              type="button"
-              class="toolbar-btn toolbar-btn--text"
-              id="add-code-btn"
-              title="Añadir código"
-              aria-label="Añadir código"
-            >
-              Añadir código
-            </button>
             <span class="toolbar-divider" aria-hidden="true"></span>
             <button
               type="button"
@@ -142,7 +144,7 @@
             </svg>
           </div>
           <p class="empty-state__title">Sin códigos todavía</p>
-          <p class="empty-state__text">Añade tu primer descuento con «Añadir código».</p>
+          <p class="empty-state__text">Añade tu primer descuento con «Añadir».</p>
         </div>
       </section>
 
@@ -153,15 +155,10 @@
         aria-label="Añadir código"
         hidden
       >
-        <button type="button" class="back-btn" id="add-back-btn" aria-label="Volver a códigos">
-          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-            <path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
-          </svg>
-          Volver
-        </button>
         <form id="code-form" class="form" novalidate>
           <div class="form__group">
-            <label class="form__label" for="code-input">Código de descuento <span class="form__required" aria-hidden="true">*</span></label>
+            <label class="form__label" for="code-input">Referencia <span class="form__required" aria-hidden="true">*</span></label>
+            <p class="form__hint">También crea la entrada si la sesión aún está en fecha.</p>
             <input
               type="text"
               id="code-input"

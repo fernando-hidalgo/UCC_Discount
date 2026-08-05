@@ -15,7 +15,7 @@ Firestore: en la consola, permite `users/{uid}/tickets/{ticketId}` igual que `co
 
 ## Web (iOS / cualquier móvil)
 
-URL: [https://ucc-discount.web.app](https://ucc-discount.web.app)
+URL: [https://ucc-manager.web.app](https://ucc-manager.web.app)
 
 Misma cuenta: códigos y entradas. Al **añadir un código** la web:
 
@@ -27,10 +27,10 @@ Requiere plan **Blaze** (Functions con red saliente).
 
 ### Deploy (Blaze)
 
-1. Firebase Console → proyecto en **Blaze**; Auth → Authorized domains con `ucc-discount.web.app`.
+1. Firebase Console → proyecto en **Blaze**; Auth → Authorized domains con `ucc-manager.web.app`.
 2. Google Cloud → OAuth **Web client**:
-   - Orígenes JS: `https://ucc-discount.web.app` y `https://ucc-discount.firebaseapp.com`
-   - URIs de redirección: **`https://ucc-discount.web.app/__/auth/handler`**
+   - Orígenes JS: `https://ucc-manager.web.app` y `https://ucc-discount.firebaseapp.com`
+   - URIs de redirección: **`https://ucc-manager.web.app/__/auth/handler`**
 3. En el PC:
 
 ```bash
@@ -42,6 +42,7 @@ cd functions && npm i && cd ..
 firebase deploy --only functions,hosting
 ```
 
+Hosting principal: `https://ucc-manager.web.app` (el proyecto Firebase sigue llamándose `ucc-discount`).
 ## Desarrollo
 
 ```bash

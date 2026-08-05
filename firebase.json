@@ -7,11 +7,16 @@
     }
   ],
   "hosting": {
+    "target": "web",
     "public": "web",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "headers": [
       {
         "source": "**/*.@(js|css)",
+        "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+      },
+      {
+        "source": "index.html",
         "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
       }
     ]

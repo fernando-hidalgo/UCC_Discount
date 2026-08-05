@@ -78,6 +78,36 @@ body:has(#view-app:not([hidden])) {
   flex: 1;
 }
 
+.header__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.btn--header-add {
+  appearance: none;
+  -moz-appearance: none;
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--color-primary);
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn--header-add:hover:not(:disabled) {
+  background: #f8fafc;
+}
+
+.btn--header-add[hidden] {
+  display: none;
+}
+
 .header__title {
   font-size: 17px;
   font-weight: 700;
@@ -208,27 +238,6 @@ body:has(#view-app:not([hidden])) {
 
 .panel--active {
   display: block;
-}
-
-.back-btn {
-  -moz-appearance: none;
-  appearance: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin: 0 0 12px;
-  padding: 0;
-  border: none;
-  background: transparent;
-  font-family: var(--font);
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--color-primary);
-  cursor: pointer;
-}
-
-.back-btn:hover {
-  color: var(--color-accent);
 }
 
 /* ─── Code list ──────────────────────────────────────────────────────────── */
@@ -682,6 +691,12 @@ body:has(#view-app:not([hidden])) {
   font-size: 11px;
   color: var(--color-text-muted);
   line-height: 1.4;
+  margin: -2px 0 8px;
+}
+
+.form__input + .form__hint,
+.datepicker + .form__hint {
+  margin: 6px 0 0;
 }
 
 .code-validation {

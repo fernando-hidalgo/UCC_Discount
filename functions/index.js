@@ -1,9 +1,12 @@
 const { setGlobalOptions } = require("firebase-functions/v2");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { initializeApp } = require("firebase-admin/app");
+const { GoogleAuth } = require("google-auth-library");
 
 initializeApp();
 setGlobalOptions({ region: "us-central1", maxInstances: 10 });
+
+const VALIDITY_DAYS = 59;
 
 const VALIDATION_URL = "https://www.compraentradas.com/Sesion/VuelvePor5";
 const ENTRADA_BASE = "https://www.compraentradas.com/Entrada";
@@ -129,6 +132,128 @@ exports.validateCode = onCall(async (request) => {
   }
 });
 
+function parseYmd(value) {
+  const s = String(value || "").trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const m = s.match(/(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})/);
+  if (!m) return "";
+  const year = m[3].length === 2 ? `20${m[3]}` : m[3];
+  return `${year}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+}
+
+function addDaysYmd(ymd, days) {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + days);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+}
+
+/** Parse discount-code ticket OCR text → fields. */
+function parseDiscountTicketText(ocrText) {
+  const text = String(ocrText || "").replace(/\r/g, "\n");
+  const flat = text.replace(/[ \t]+/g, " ");
+
+  const referencia =
+    (flat.match(/Referencia\s*[:.]?\s*(\d{10,14})/i) || [])[1] || "";
+
+  const seats =
+    (flat.match(/N\s*[ºo°.]?\s*Butacas?\s*[:.]?\s*(\d{1,2})/i) ||
+      flat.match(/Butacas?\s*[:.]?\s*(\d{1,2})/i) ||
+      [])[1] || "";
+
+  const validoRaw =
+    (flat.match(/V[aá]lido\s+Hasta\s*[:.]?\s*(\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{2,4})/i) ||
+      [])[1] || "";
+
+  // Prefer printed "Fecha creación"; fall back to Válido Hasta − validity window.
+  const fechaCreacionRaw =
+    (flat.match(/Fecha\s*(?:de\s*)?creaci[oó]n\s*[:.]?\s*(\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{2,4})/i) ||
+      flat.match(/(?:^|\n)\s*Fecha\s*[:.]?\s*(\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{2,4})/i) ||
+      [])[1] || "";
+
+  const validoHasta = parseYmd(validoRaw);
+  const createdAt =
+    parseYmd(fechaCreacionRaw) || (validoHasta ? addDaysYmd(validoHasta, -VALIDITY_DAYS) : "");
+  const seatsNum = Number.parseInt(seats, 10);
+  const seatsOk =
+    Number.isInteger(seatsNum) && seatsNum >= 1 && seatsNum <= 10 ? String(seatsNum) : "";
+  const refClean = String(referencia).replace(/\D/g, "");
+
+  return {
+    referencia: /^\d{10,14}$/.test(refClean) ? refClean : "",
+    seats: seatsOk,
+    createdAt,
+    validoHasta,
+  };
+}
+
+exports.parseDiscountTicketText = parseDiscountTicketText;
+
+let visionAuth;
+async function visionOcrText(imageBase64) {
+  if (!visionAuth) {
+    visionAuth = new GoogleAuth({
+      scopes: ["https://www.googleapis.com/auth/cloud-vision"],
+    });
+  }
+  const client = await visionAuth.getClient();
+  const res = await client.request({
+    url: "https://vision.googleapis.com/v1/images:annotate",
+    method: "POST",
+    data: {
+      requests: [
+        {
+          image: { content: imageBase64 },
+          features: [{ type: "DOCUMENT_TEXT_DETECTION" }],
+        },
+      ],
+    },
+  });
+  const response = res.data?.responses?.[0];
+  if (response?.error) {
+    throw new Error(response.error.message || JSON.stringify(response.error));
+  }
+  return String(response?.fullTextAnnotation?.text || response?.textAnnotations?.[0]?.description || "");
+}
+
+exports.readTicket = onCall(
+  {
+    timeoutSeconds: 60,
+    memory: "512MiB",
+  },
+  async (request) => {
+    requireAuth(request);
+    const imageBase64 = String(request.data?.imageBase64 || "").replace(/^data:[^;]+;base64,/, "");
+    const mimeType = String(request.data?.mimeType || "image/jpeg").split(";")[0].trim();
+    if (!imageBase64 || imageBase64.length < 100) {
+      throw new HttpsError("invalid-argument", "Falta la imagen.");
+    }
+    if (!/^image\/(jpeg|jpg|png|webp|gif)$/i.test(mimeType)) {
+      throw new HttpsError("invalid-argument", "Formato de imagen no soportado.");
+    }
+    if (imageBase64.length > 4_500_000) {
+      throw new HttpsError("invalid-argument", "Imagen demasiado grande.");
+    }
+
+    try {
+      const ocrText = await visionOcrText(imageBase64);
+      if (!ocrText.trim()) {
+        return { referencia: "", seats: "", createdAt: "" };
+      }
+      console.log("readTicket ocr", ocrText.slice(0, 300).replace(/\n/g, " | "));
+      return parseDiscountTicketText(ocrText);
+    } catch (err) {
+      if (err instanceof HttpsError) throw err;
+      console.error("readTicket", err);
+      const msg = String(err?.message || err || "");
+      if (/403|PERMISSION|permission|ACCESS_TOKEN|has not been used|disabled/i.test(msg)) {
+        throw new HttpsError("permission-denied", "OCR no habilitado en el proyecto.");
+      }
+      throw new HttpsError("internal", "No se pudo leer el ticket.");
+    }
+  },
+);
+
 exports.fetchEntrada = onCall(
   {
     timeoutSeconds: 60,
@@ -146,12 +271,12 @@ exports.fetchEntrada = onCall(
         headers: { Accept: "text/html" },
       });
       if (!pageRes.ok) {
-        throw new HttpsError("not-found", `Entrada HTTP ${pageRes.status}`);
+        return { found: false };
       }
       const html = await pageRes.text();
       const parsed = parseEntradaHtml(html, referencia);
       if (!parsed.accessCode || !parsed.qrPath || !parsed.barcodePath) {
-        throw new HttpsError("failed-precondition", "No se encontraron QR/barras en la entrada.");
+        return { found: false };
       }
 
       const [qrRes, barcodeRes] = await Promise.all([
@@ -159,7 +284,7 @@ exports.fetchEntrada = onCall(
         fetch(`https://www.compraentradas.com${parsed.barcodePath}`),
       ]);
       if (!qrRes.ok || !barcodeRes.ok) {
-        throw new HttpsError("internal", "No se pudieron descargar las imágenes.");
+        return { found: false };
       }
 
       const [qrDataUrl, barcodeDataUrl] = await Promise.all([
@@ -168,6 +293,7 @@ exports.fetchEntrada = onCall(
       ]);
 
       return {
+        found: true,
         accessCode: parsed.accessCode,
         referencia: parsed.referencia || referencia,
         title: parsed.title,
@@ -181,7 +307,7 @@ exports.fetchEntrada = onCall(
     } catch (err) {
       if (err instanceof HttpsError) throw err;
       console.error("fetchEntrada", err);
-      throw new HttpsError("internal", "No se pudo obtener la entrada.");
+      return { found: false };
     }
   },
 );

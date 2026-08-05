@@ -49,6 +49,7 @@
     let showtime = "";
     let cinema = "";
     let seatsText = "";
+    let seats = 1;
 
     if (infoCol) {
       const lines = infoCol.innerText
@@ -66,6 +67,7 @@
       showtime = lines.find((l) => /\d{2}\/\d{2}\/\d{4}/.test(l)) || "";
       cinema = lines.find((l) => /cinemas/i.test(l)) || "";
       const seatLines = lines.filter((l) => /Butaca Fila/i.test(l));
+      seats = seatLines.length > 0 ? seatLines.length : 1;
       seatsText = seatLines
         .map((l) => {
           const m = l.match(/Fila:\s*(\d+),\s*Butaca:\s*(\d+)/i);
@@ -81,15 +83,40 @@
       showtime,
       cinema,
       seatsText,
+      seats,
       qrImg,
       barcodeImg,
     };
   }
 
-  function setStatus(el, text, kind) {
-    el.textContent = text;
-    el.className = `ucc-save-ticket__status ucc-save-ticket__status--${kind}`;
-    el.hidden = !text;
+  function showtimeToCreatedAt(showtime) {
+    const m = String(showtime || "").match(/(\d{2})\/(\d{2})\/(\d{4})/);
+    if (!m) {
+      const now = new Date();
+      return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    }
+    return `${m[3]}-${m[2]}-${m[1]}`;
+  }
+
+  function setBtnState(btn, label, state) {
+    btn.dataset.state = state;
+    label.textContent =
+      state === "saving" ? "Guardando…" :
+      state === "saved"  ? "Guardado"   :
+      state === "updated"? "Actualizado":
+      state === "error"  ? "Error"      : "Guardar";
+    // re-trigger CSS animation by cloning animation
+    if (state === "saved" || state === "error") {
+      btn.style.animation = "none";
+      btn.offsetWidth; // reflow
+      btn.style.animation = "";
+    }
+  }
+
+  function setError(status, text) {
+    status.textContent = text;
+    status.className = "ucc-save-ticket__status ucc-save-ticket__status--error";
+    status.hidden = false;
   }
 
   function mount() {
@@ -122,9 +149,31 @@
     logo.width = 22;
     logo.height = 22;
 
+    const spinner = document.createElement("div");
+    spinner.className = "ucc-save-ticket__spinner";
+    spinner.setAttribute("aria-hidden", "true");
+
+    const checkSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    checkSvg.setAttribute("class", "ucc-save-ticket__check");
+    checkSvg.setAttribute("width", "20");
+    checkSvg.setAttribute("height", "20");
+    checkSvg.setAttribute("viewBox", "0 0 20 20");
+    checkSvg.setAttribute("fill", "none");
+    checkSvg.setAttribute("aria-hidden", "true");
+    const checkPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    checkPath.setAttribute("class", "ucc-save-ticket__check-path");
+    checkPath.setAttribute("d", "M4 10.5 L8.5 15 L16 6");
+    checkPath.setAttribute("stroke", "#fff");
+    checkPath.setAttribute("stroke-width", "2.4");
+    checkPath.setAttribute("stroke-linecap", "round");
+    checkPath.setAttribute("stroke-linejoin", "round");
+    checkSvg.appendChild(checkPath);
+
     const label = document.createElement("span");
-    label.textContent = "Guardar entrada";
-    btn.append(logo, label);
+    label.className = "ucc-save-ticket__label";
+    label.textContent = "Guardar";
+
+    btn.append(logo, spinner, checkSvg, label);
 
     const status = document.createElement("p");
     status.className = "ucc-save-ticket__status";
@@ -133,7 +182,8 @@
 
     btn.addEventListener("click", async () => {
       btn.disabled = true;
-      setStatus(status, "Guardando…", "info");
+      status.hidden = true;
+      setBtnState(btn, label, "saving");
       try {
         const [qrDataUrl, barcodeDataUrl] = await Promise.all([
           imgToDataUrl(parsed.qrImg),
@@ -150,23 +200,30 @@
           barcodeDataUrl,
           savedAt: new Date().toISOString(),
         };
-        const res = await browser.runtime.sendMessage({ type: "save-ticket", ticket });
+        const payload = { type: "save-ticket", ticket };
+        if (parsed.referencia) {
+          payload.code = {
+            code: parsed.referencia,
+            createdAt: showtimeToCreatedAt(parsed.showtime),
+            seats: parsed.seats,
+          };
+        }
+        const res = await browser.runtime.sendMessage(payload);
         if (!res?.ok) {
-          if (res?.error === "not_signed_in") {
-            setStatus(status, "Inicia sesión en UCC Manager.", "error");
-          } else {
-            setStatus(status, "No se pudo guardar.", "error");
-          }
+          setBtnState(btn, label, "error");
+          const msg = res?.error === "not_signed_in"
+            ? "Inicia sesión en UCC Manager."
+            : "No se pudo guardar.";
+          setError(status, msg);
+          btn.disabled = false;
           return;
         }
-        setStatus(
-          status,
-          res.created ? "Entrada guardada." : "Entrada actualizada.",
-          "ok",
-        );
+        const fresh = res.ticketCreated || res.codeCreated;
+        setBtnState(btn, label, fresh ? "saved" : "updated");
+        // keep disabled — already saved
       } catch {
-        setStatus(status, "No se pudo guardar.", "error");
-      } finally {
+        setBtnState(btn, label, "error");
+        setError(status, "No se pudo guardar.");
         btn.disabled = false;
       }
     });

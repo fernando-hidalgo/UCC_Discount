@@ -1,7 +1,7 @@
 export const FIREBASE_CONFIG = {
   apiKey: "TU_API_KEY",
   // Same-origin as Hosting — required for Safari/iOS (blocks 3rd-party storage on redirect)
-  authDomain: "ucc-discount.web.app",
+  authDomain: "ucc-manager.web.app",
   projectId: "ucc-discount",
   storageBucket: "ucc-discount.firebasestorage.app",
   messagingSenderId: "854690175498",

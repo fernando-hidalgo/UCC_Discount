@@ -74,6 +74,12 @@ export async function fetchEntradaRemote(referencia) {
   return res.data;
 }
 
+export async function readTicketRemote({ imageBase64, mimeType }) {
+  const fn = httpsCallable(functions, "readTicket");
+  const res = await fn({ imageBase64, mimeType });
+  return res.data;
+}
+
 function codesCol(uid) {
   return collection(db, "users", uid, "codes");
 }
